@@ -1,0 +1,25 @@
+# Go
+bin/
+backend/vendor/
+
+# Proto generated code (regenerate with make proto)
+backend/internal/schema/*.go
+adapters/panopticon/proto/
+frontend/src/proto/
+
+# SQLite
+*.db
+*.db-shm
+*.db-wal
+~/.usip/
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# Env
+.env
+.env.local
+
+# macOS
+.DS_Store
