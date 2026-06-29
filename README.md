@@ -72,9 +72,13 @@ All five `.proto` files live in `proto/` and are the canonical source of truth f
 - [x] Custom engine adapter (Go — reference implementation, gRPC `SimAdapter`)
 - [x] Adapter registry (dynamic registration, no hardcoded engine list)
 - [x] Orchestrator (registry lookup → gRPC Initialize/Run/GetResults → normalize → persist)
-- [ ] Results + playback (entity track scrubbing on Cesium)
-- [ ] Mission config panels
-- [ ] Layer/engine filter controls
+- [x] Frontend UI (Mantine): entity placement, mission config, run trigger, playback, results
+- [x] Results + playback (entity track scrubbing on Cesium)
+- [x] Mission config panels (mission type, ROE, waypoints, objectives)
+- [x] Layer/engine filter controls (domain layers + engine result filter)
+
+**v1 is feature-complete.** Place units on the globe, configure missions, run a
+sim, and scrub the resulting tracks — all wired to the Go backend.
 
 ## End-to-end run flow (working today)
 

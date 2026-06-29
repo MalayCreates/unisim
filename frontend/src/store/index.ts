@@ -1,57 +1,98 @@
 import { create } from 'zustand';
-import type { Entity, Run, Scenario, SimResults } from '../types';
+import { v4 as uuidv4 } from 'uuid';
+import type {
+  Entity,
+  EntityMission,
+  EntityType,
+  RunStatus,
+  Scenario,
+  Side,
+  SimResults,
+  Waypoint,
+} from '../types';
+import { DOMAINS, type Domain } from '../lib/domain';
 
-interface ScenarioState {
-  // Scenario list
+export type InteractionMode = 'select' | 'place' | 'waypoint';
+
+function defaultMission(entityId: string): EntityMission {
+  return {
+    entity_id: entityId,
+    mission_type: 'patrol',
+    waypoints: [],
+    roe: 'weapons_tight',
+    objectives: [],
+    timeline: { start_offset_s: 0, expected_duration_s: 0 },
+  };
+}
+
+interface AppStore {
+  // --- Scenarios ---
   scenarios: Scenario[];
+  activeScenario: Scenario | null;
+  dirty: boolean;
   setScenarios: (s: Scenario[]) => void;
   upsertScenario: (s: Scenario) => void;
   removeScenario: (id: string) => void;
-
-  // Active scenario being edited
-  activeScenario: Scenario | null;
   setActiveScenario: (s: Scenario | null) => void;
+  markClean: () => void;
 
-  // Selected entity on the map
+  // --- Interaction ---
+  interactionMode: InteractionMode;
+  paletteType: EntityType;
+  paletteSide: Side;
   selectedEntityId: string | null;
-  setSelectedEntityId: (id: string | null) => void;
+  setInteractionMode: (m: InteractionMode) => void;
+  setPalette: (type: EntityType, side: Side) => void;
+  selectEntity: (id: string | null) => void;
 
-  // Convenience: mutate entities within the active scenario
-  upsertEntity: (e: Entity) => void;
+  // --- Entity editing (operate on activeScenario) ---
+  addEntityAt: (lat: number, lon: number, altM?: number) => void;
+  updateEntity: (e: Entity) => void;
   removeEntity: (id: string) => void;
-}
 
-interface RunState {
-  runs: Run[];
-  setRuns: (runs: Run[]) => void;
-  upsertRun: (r: Run) => void;
+  // --- Mission editing ---
+  missionFor: (entityId: string) => EntityMission | undefined;
+  updateMission: (m: EntityMission) => void;
+  addWaypointAt: (entityId: string, lat: number, lon: number, altM?: number) => void;
+  removeWaypoint: (entityId: string, index: number) => void;
 
+  // --- Runs / results ---
+  runStatus: RunStatus | null;
   activeRunId: string | null;
-  setActiveRunId: (id: string | null) => void;
-
   results: SimResults | null;
+  setRunStatus: (s: RunStatus | null) => void;
+  setActiveRunId: (id: string | null) => void;
   setResults: (r: SimResults | null) => void;
 
-  // Playback scrub position (ms into the scenario)
-  playbackTimeMS: number;
+  // --- Playback ---
+  playing: boolean;
+  playbackTimeMS: number; // relative ms from track start
+  setPlaying: (p: boolean) => void;
   setPlaybackTimeMS: (t: number) => void;
+
+  // --- Layer filters ---
+  visibleDomains: Domain[];
+  visibleEngines: string[];
+  toggleDomain: (d: Domain) => void;
+  setVisibleDomains: (d: Domain[]) => void;
+  toggleEngine: (id: string) => void;
+  setVisibleEngines: (ids: string[]) => void;
 }
 
-interface LayerState {
-  // Which domains are visible
-  visibleDomains: Set<string>;
-  toggleDomain: (domain: string) => void;
-
-  // Which engine IDs are visible in results
-  visibleEngines: Set<string>;
-  toggleEngine: (engineId: string) => void;
+// Helper: immutably patch the active scenario and flag it dirty.
+function patchActive(
+  scenario: Scenario | null,
+  fn: (s: Scenario) => Scenario,
+): Partial<AppStore> {
+  if (!scenario) return {};
+  return { activeScenario: fn(scenario), dirty: true };
 }
 
-type AppStore = ScenarioState & RunState & LayerState;
-
-export const useStore = create<AppStore>((set) => ({
-  // --- ScenarioState ---
+export const useStore = create<AppStore>((set, get) => ({
+  // --- Scenarios ---
   scenarios: [],
+  activeScenario: null,
+  dirty: false,
   setScenarios: (scenarios) => set({ scenarios }),
   upsertScenario: (sc) =>
     set((s) => ({
@@ -61,67 +102,147 @@ export const useStore = create<AppStore>((set) => ({
     })),
   removeScenario: (id) =>
     set((s) => ({ scenarios: s.scenarios.filter((x) => x.id !== id) })),
-
-  activeScenario: null,
-  setActiveScenario: (sc) => set({ activeScenario: sc }),
-
-  selectedEntityId: null,
-  setSelectedEntityId: (id) => set({ selectedEntityId: id }),
-
-  upsertEntity: (entity) =>
-    set((s) => {
-      if (!s.activeScenario) return {};
-      const entities = s.activeScenario.entities ?? [];
-      const updated = entities.some((e) => e.id === entity.id)
-        ? entities.map((e) => (e.id === entity.id ? entity : e))
-        : [...entities, entity];
-      return { activeScenario: { ...s.activeScenario, entities: updated } };
+  setActiveScenario: (sc) =>
+    set({
+      activeScenario: sc,
+      dirty: false,
+      selectedEntityId: null,
+      results: null,
+      runStatus: null,
+      activeRunId: null,
+      playing: false,
+      playbackTimeMS: 0,
+      interactionMode: 'select',
     }),
+  markClean: () => set({ dirty: false }),
 
-  removeEntity: (id) =>
+  // --- Interaction ---
+  interactionMode: 'select',
+  paletteType: 'fixed_wing',
+  paletteSide: 'friendly',
+  selectedEntityId: null,
+  setInteractionMode: (interactionMode) => set({ interactionMode }),
+  setPalette: (paletteType, paletteSide) => set({ paletteType, paletteSide }),
+  selectEntity: (selectedEntityId) => set({ selectedEntityId }),
+
+  // --- Entity editing ---
+  addEntityAt: (lat, lon, altM = 0) =>
     set((s) => {
       if (!s.activeScenario) return {};
+      const entity: Entity = {
+        id: uuidv4(),
+        name: `${s.paletteType}-${s.activeScenario.entities.length + 1}`,
+        type: s.paletteType,
+        side: s.paletteSide,
+        position: { lat, lon, alt_m: altM },
+        attributes: {},
+      };
       return {
-        activeScenario: {
-          ...s.activeScenario,
-          entities: s.activeScenario.entities.filter((e) => e.id !== id),
-        },
+        ...patchActive(s.activeScenario, (sc) => ({
+          ...sc,
+          entities: [...sc.entities, entity],
+        })),
+        selectedEntityId: entity.id,
       };
     }),
-
-  // --- RunState ---
-  runs: [],
-  setRuns: (runs) => set({ runs }),
-  upsertRun: (r) =>
+  updateEntity: (e) =>
+    set((s) =>
+      patchActive(s.activeScenario, (sc) => ({
+        ...sc,
+        entities: sc.entities.map((x) => (x.id === e.id ? e : x)),
+      })),
+    ),
+  removeEntity: (id) =>
     set((s) => ({
-      runs: s.runs.some((x) => x.id === r.id)
-        ? s.runs.map((x) => (x.id === r.id ? r : x))
-        : [...s.runs, r],
+      ...patchActive(s.activeScenario, (sc) => ({
+        ...sc,
+        entities: sc.entities.filter((x) => x.id !== id),
+        missions: (sc.missions ?? []).filter((m) => m.entity_id !== id),
+      })),
+      selectedEntityId: s.selectedEntityId === id ? null : s.selectedEntityId,
     })),
 
+  // --- Mission editing ---
+  missionFor: (entityId) =>
+    (get().activeScenario?.missions ?? []).find((m) => m.entity_id === entityId),
+  updateMission: (m) =>
+    set((s) =>
+      patchActive(s.activeScenario, (sc) => {
+        const missions = sc.missions ?? [];
+        return {
+          ...sc,
+          missions: missions.some((x) => x.entity_id === m.entity_id)
+            ? missions.map((x) => (x.entity_id === m.entity_id ? m : x))
+            : [...missions, m],
+        };
+      }),
+    ),
+  addWaypointAt: (entityId, lat, lon, altM = 0) =>
+    set((s) =>
+      patchActive(s.activeScenario, (sc) => {
+        const missions = sc.missions ?? [];
+        const existing = missions.find((m) => m.entity_id === entityId);
+        const wp: Waypoint = { lat, lon, alt_m: altM, speed_ms: 200, hold_time_s: 0 };
+        if (existing) {
+          return {
+            ...sc,
+            missions: missions.map((m) =>
+              m.entity_id === entityId ? { ...m, waypoints: [...m.waypoints, wp] } : m,
+            ),
+          };
+        }
+        const created = defaultMission(entityId);
+        created.waypoints = [wp];
+        return { ...sc, missions: [...missions, created] };
+      }),
+    ),
+  removeWaypoint: (entityId, index) =>
+    set((s) =>
+      patchActive(s.activeScenario, (sc) => ({
+        ...sc,
+        missions: (sc.missions ?? []).map((m) =>
+          m.entity_id === entityId
+            ? { ...m, waypoints: m.waypoints.filter((_, i) => i !== index) }
+            : m,
+        ),
+      })),
+    ),
+
+  // --- Runs / results ---
+  runStatus: null,
   activeRunId: null,
-  setActiveRunId: (id) => set({ activeRunId: id }),
-
   results: null,
-  setResults: (results) => set({ results }),
+  setRunStatus: (runStatus) => set({ runStatus }),
+  setActiveRunId: (activeRunId) => set({ activeRunId }),
+  setResults: (results) =>
+    set({
+      results,
+      playbackTimeMS: 0,
+      playing: false,
+      visibleEngines: results ? [results.engine_id] : [],
+    }),
 
+  // --- Playback ---
+  playing: false,
   playbackTimeMS: 0,
-  setPlaybackTimeMS: (t) => set({ playbackTimeMS: t }),
+  setPlaying: (playing) => set({ playing }),
+  setPlaybackTimeMS: (playbackTimeMS) => set({ playbackTimeMS }),
 
-  // --- LayerState ---
-  visibleDomains: new Set(['air', 'land', 'sea', 'space', 'cyber']),
-  toggleDomain: (domain) =>
-    set((s) => {
-      const next = new Set(s.visibleDomains);
-      next.has(domain) ? next.delete(domain) : next.add(domain);
-      return { visibleDomains: next };
-    }),
-
-  visibleEngines: new Set<string>(),
-  toggleEngine: (engineId) =>
-    set((s) => {
-      const next = new Set(s.visibleEngines);
-      next.has(engineId) ? next.delete(engineId) : next.add(engineId);
-      return { visibleEngines: next };
-    }),
+  // --- Layer filters ---
+  visibleDomains: [...DOMAINS],
+  visibleEngines: [],
+  toggleDomain: (d) =>
+    set((s) => ({
+      visibleDomains: s.visibleDomains.includes(d)
+        ? s.visibleDomains.filter((x) => x !== d)
+        : [...s.visibleDomains, d],
+    })),
+  setVisibleDomains: (visibleDomains) => set({ visibleDomains }),
+  toggleEngine: (id) =>
+    set((s) => ({
+      visibleEngines: s.visibleEngines.includes(id)
+        ? s.visibleEngines.filter((x) => x !== id)
+        : [...s.visibleEngines, id],
+    })),
+  setVisibleEngines: (visibleEngines) => set({ visibleEngines }),
 }));
