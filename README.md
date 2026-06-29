@@ -13,37 +13,46 @@ Web front end and orchestration layer for multiple military simulation engines (
 | buf (proto codegen) | `brew install bufbuild/buf/buf` |
 | SQLite | bundled with `go-sqlite3` (requires cgo / Xcode CLT) |
 
-### 1. Generate protobuf stubs
+> `buf` has prebuilt binaries if Homebrew is blocked by outdated Xcode CLT:
+> `curl -sSL https://github.com/bufbuild/buf/releases/latest/download/buf-Darwin-arm64 -o $(go env GOPATH)/bin/buf && chmod +x $(go env GOPATH)/bin/buf`
+> (the Go protoc plugins also need to be on PATH —
+> `go install google.golang.org/protobuf/cmd/protoc-gen-go@latest` and
+> `go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest`).
+
+### 1. One-time setup
 
 ```sh
-make proto
+make proto             # generate Go stubs into backend/schema/ (gitignored)
+make install-frontend  # npm install in frontend/
 ```
 
-This runs `buf generate proto` and writes Go/Python/TypeScript stubs into:
-- `backend/internal/schema/`
-- `adapters/panopticon/proto/`
-- `frontend/src/proto/`
-
-### 2. Start the backend
+### 2. Run everything
 
 ```sh
-make backend
-# Listens on :8080, creates ~/.usip/usip.db
+make dev               # backend (:8080) + custom-engine adapter (:50051) + frontend (:5173)
 ```
 
-### 3. Start the frontend
+### 3. Load a sample scenario
+
+In a second terminal, once `make dev` is up:
 
 ```sh
-make install-frontend
-make frontend
-# Vite dev server on :5173, proxies /api → :8080
+make seed              # POSTs scripts/sample-scenario.json to the backend
 ```
 
-### Combined dev
+Then open **http://localhost:5173**, pick *“Sample — Coastal Strike (San Diego)”*
+from the scenario dropdown, and click **Run**. Two blue fighters strike a pair of
+red destroyers — scrub the playback bar to watch the tracks and review MOEs,
+events, and kill chains.
+
+### Backend only (API / seed testing, no frontend)
 
 ```sh
-make dev
+make stack             # backend + adapter together
+make seed              # in another terminal
 ```
+
+To start pieces individually: `make backend`, `make adapter`, `make frontend`.
 
 ## Architecture
 

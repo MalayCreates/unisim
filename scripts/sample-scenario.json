@@ -1,0 +1,65 @@
+{
+  "name": "Sample — Coastal Strike (San Diego)",
+  "description": "Two blue fighters strike a pair of red destroyers off the coast while a blue cruiser patrols. Good for exercising detection, engagement, kills, and playback.",
+  "duration_s": 900,
+  "engine_hint": "custom-engine",
+  "entities": [
+    { "id": "blue-strike-1", "name": "Hornet 1", "type": "fixed_wing", "side": "friendly", "position": { "lat": 32.55, "lon": -116.40, "alt_m": 9000 } },
+    { "id": "blue-strike-2", "name": "Hornet 2", "type": "fixed_wing", "side": "friendly", "position": { "lat": 32.95, "lon": -116.45, "alt_m": 9000 } },
+    { "id": "blue-cruiser", "name": "USS Reference", "type": "surface_vessel", "side": "friendly", "position": { "lat": 32.40, "lon": -117.50, "alt_m": 0 } },
+    { "id": "red-destroyer-1", "name": "Red DDG 1", "type": "surface_vessel", "side": "enemy", "position": { "lat": 32.80, "lon": -117.90, "alt_m": 0 } },
+    { "id": "red-destroyer-2", "name": "Red DDG 2", "type": "surface_vessel", "side": "enemy", "position": { "lat": 32.95, "lon": -118.00, "alt_m": 0 } }
+  ],
+  "missions": [
+    {
+      "entity_id": "blue-strike-1",
+      "mission_type": "strike",
+      "roe": "weapons_free",
+      "waypoints": [
+        { "lat": 32.78, "lon": -117.88, "alt_m": 4000, "speed_ms": 250, "hold_time_s": 0 }
+      ],
+      "objectives": ["Destroy Red DDG 1"],
+      "timeline": { "start_offset_s": 0, "expected_duration_s": 900 }
+    },
+    {
+      "entity_id": "blue-strike-2",
+      "mission_type": "strike",
+      "roe": "weapons_free",
+      "waypoints": [
+        { "lat": 32.93, "lon": -117.98, "alt_m": 4000, "speed_ms": 250, "hold_time_s": 0 }
+      ],
+      "objectives": ["Destroy Red DDG 2"],
+      "timeline": { "start_offset_s": 0, "expected_duration_s": 900 }
+    },
+    {
+      "entity_id": "blue-cruiser",
+      "mission_type": "patrol",
+      "roe": "weapons_tight",
+      "waypoints": [
+        { "lat": 32.55, "lon": -117.70, "alt_m": 0, "speed_ms": 12, "hold_time_s": 0 }
+      ],
+      "objectives": ["Patrol the approaches"],
+      "timeline": { "start_offset_s": 0, "expected_duration_s": 900 }
+    },
+    {
+      "entity_id": "red-destroyer-1",
+      "mission_type": "patrol",
+      "roe": "weapons_tight",
+      "waypoints": [
+        { "lat": 32.70, "lon": -117.95, "alt_m": 0, "speed_ms": 10, "hold_time_s": 0 }
+      ],
+      "objectives": ["Hold station"],
+      "timeline": { "start_offset_s": 0, "expected_duration_s": 900 }
+    },
+    {
+      "entity_id": "red-destroyer-2",
+      "mission_type": "patrol",
+      "roe": "weapons_tight",
+      "waypoints": [
+        { "lat": 33.02, "lon": -118.05, "alt_m": 0, "speed_ms": 10, "hold_time_s": 0 }
+      ],
+      "objectives": ["Hold station"],
+      "timeline": { "start_offset_s": 0, "expected_duration_s": 900 }
+    }
+  ]
+}
