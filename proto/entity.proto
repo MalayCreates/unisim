@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package usip.v1;
+
+option go_package = "github.com/usip/backend/internal/schema;schema";
+
+// EntityType enumerates every physical platform the platform can represent.
+enum EntityType {
+  ENTITY_TYPE_UNSPECIFIED = 0;
+  ENTITY_TYPE_FIXED_WING = 1;
+  ENTITY_TYPE_ROTARY_WING = 2;
+  ENTITY_TYPE_GROUND_VEHICLE = 3;
+  ENTITY_TYPE_DISMOUNTED_INFANTRY = 4;
+  ENTITY_TYPE_SURFACE_VESSEL = 5;
+  ENTITY_TYPE_SUBMARINE = 6;
+  ENTITY_TYPE_SATELLITE = 7;
+  ENTITY_TYPE_UAV = 8;
+  ENTITY_TYPE_MISSILE = 9;
+  ENTITY_TYPE_RADAR_SENSOR = 10;
+  ENTITY_TYPE_BASE_FOB = 11;
+}
+
+enum Side {
+  SIDE_UNSPECIFIED = 0;
+  SIDE_FRIENDLY = 1;
+  SIDE_ENEMY = 2;
+  SIDE_NEUTRAL = 3;
+}
+
+message Position {
+  double lat = 1;
+  double lon = 2;
+  double alt_m = 3; // meters MSL
+}
+
+message Entity {
+  string id = 1;
+  string name = 2;
+  EntityType type = 3;
+  Side side = 4;
+  Position position = 5;
+  // Engine-specific or display metadata; not interpreted by the platform core.
+  map<string, string> attributes = 6;
+}

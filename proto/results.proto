@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+package usip.v1;
+
+option go_package = "github.com/usip/backend/internal/schema;schema";
+
+import "google/protobuf/timestamp.proto";
+
+message TrackPoint {
+  google.protobuf.Timestamp ts = 1;
+  double lat = 2;
+  double lon = 3;
+  double alt_m = 4;
+  double heading_deg = 5;
+  double speed_ms = 6;
+  string status = 7; // alive | killed | damaged | unknown
+}
+
+message EntityTrack {
+  string entity_id = 1;
+  repeated TrackPoint points = 2;
+}
+
+enum EventType {
+  EVENT_TYPE_UNSPECIFIED = 0;
+  EVENT_TYPE_DETECTION = 1;
+  EVENT_TYPE_ENGAGEMENT = 2;
+  EVENT_TYPE_KILL = 3;
+  EVENT_TYPE_DAMAGE = 4;
+  EVENT_TYPE_LAUNCH = 5;
+  EVENT_TYPE_WAYPOINT_REACHED = 6;
+  EVENT_TYPE_MISSION_COMPLETE = 7;
+}
+
+message SimEvent {
+  google.protobuf.Timestamp ts = 1;
+  EventType type = 2;
+  string entity_id = 3;
+  string target_entity_id = 4; // populated for engagement/kill events
+  string detail = 5;           // free-text description
+}
+
+message KillChain {
+  string attacker_entity_id = 1;
+  string target_entity_id = 2;
+  google.protobuf.Timestamp engaged_at = 3;
+  google.protobuf.Timestamp killed_at = 4;
+  repeated string weapon_ids = 5; // munition entity ids, if modelled
+}
+
+message MOEMetric {
+  string key = 1;
+  double value = 2;
+  string unit = 3;
+}
+
+message SimResultsProto {
+  string scenario_id = 1;
+  string engine_id = 2;
+  string run_id = 3;
+  repeated EntityTrack entity_tracks = 4;
+  repeated SimEvent events = 5;
+  repeated KillChain kill_chains = 6;
+  repeated MOEMetric moe_metrics = 7;
+}

@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package usip.v1;
+
+option go_package = "github.com/usip/backend/internal/schema;schema";
+
+import "entity.proto";
+import "google/protobuf/timestamp.proto";
+
+message ScenarioSide {
+  Side affiliation = 1;
+  string label = 2; // e.g. "Blue Force", "Red Force"
+}
+
+message TerrainReference {
+  // Bounding box describing the region of interest.
+  double min_lat = 1;
+  double max_lat = 2;
+  double min_lon = 3;
+  double max_lon = 4;
+  string description = 5;
+}
+
+message ScenarioProto {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  repeated ScenarioSide sides = 4;
+  repeated Entity entities = 5;
+  google.protobuf.Timestamp start_time = 6;
+  uint32 duration_s = 7; // simulation duration in seconds
+  TerrainReference terrain = 8;
+  // Hint to the orchestrator — which adapter to route this scenario to.
+  string engine_hint = 9;
+}

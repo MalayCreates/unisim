@@ -1,0 +1,24 @@
+version: v1
+plugins:
+  # Go types + gRPC stubs
+  - plugin: buf.build/protocolbuffers/go
+    out: backend/internal/schema
+    opt:
+      - paths=source_relative
+  - plugin: buf.build/grpc/go
+    out: backend/internal/schema
+    opt:
+      - paths=source_relative
+      - require_unimplemented_servers=false
+
+  # Python types + gRPC stubs (for Panopticon adapter)
+  - plugin: buf.build/protocolbuffers/python
+    out: adapters/panopticon/proto
+  - plugin: buf.build/grpc/python
+    out: adapters/panopticon/proto
+
+  # TypeScript types (for frontend)
+  - plugin: buf.build/bufbuild/es
+    out: frontend/src/proto
+    opt:
+      - target=ts

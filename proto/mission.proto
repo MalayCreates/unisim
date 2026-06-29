@@ -1,0 +1,54 @@
+syntax = "proto3";
+
+package usip.v1;
+
+option go_package = "github.com/usip/backend/internal/schema;schema";
+
+import "entity.proto";
+
+enum MissionType {
+  MISSION_TYPE_UNSPECIFIED = 0;
+  MISSION_TYPE_CAP = 1;  // Combat Air Patrol
+  MISSION_TYPE_CAS = 2;  // Close Air Support
+  MISSION_TYPE_STRIKE = 3;
+  MISSION_TYPE_PATROL = 4;
+  MISSION_TYPE_RECON = 5;
+  MISSION_TYPE_ESCORT = 6;
+  MISSION_TYPE_SAR = 7;  // Search and Rescue
+  MISSION_TYPE_TRANSIT = 8;
+}
+
+enum ROE {
+  ROE_UNSPECIFIED = 0;
+  ROE_WEAPONS_HOLD = 1;   // Do not engage unless fired upon
+  ROE_WEAPONS_TIGHT = 2;  // Engage only positively identified targets
+  ROE_WEAPONS_FREE = 3;   // Engage all non-friendlies
+}
+
+message Waypoint {
+  double lat = 1;
+  double lon = 2;
+  double alt_m = 3;
+  double speed_ms = 4;     // meters/second
+  uint32 hold_time_s = 5;  // seconds to loiter at this point
+}
+
+message MissionTimeline {
+  uint32 start_offset_s = 1;   // seconds from scenario start_time
+  uint32 expected_duration_s = 2;
+}
+
+message EntityMission {
+  string entity_id = 1;
+  MissionType mission_type = 2;
+  repeated Waypoint waypoints = 3;
+  ROE roe = 4;
+  repeated string objectives = 5;
+  MissionTimeline timeline = 6;
+}
+
+// ScenarioMissions groups all per-entity missions for a scenario.
+message ScenarioMissions {
+  string scenario_id = 1;
+  repeated EntityMission missions = 2;
+}

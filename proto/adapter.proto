@@ -1,0 +1,53 @@
+syntax = "proto3";
+
+package usip.v1;
+
+option go_package = "github.com/usip/backend/internal/schema;schema";
+
+import "scenario.proto";
+import "results.proto";
+
+message InitResponse {
+  bool success = 1;
+  string message = 2;
+  string adapter_version = 3;
+}
+
+message RunRequest {
+  string run_id = 1;
+  string scenario_id = 2;
+}
+
+message RunResponse {
+  bool accepted = 1;
+  string message = 2;
+}
+
+message ResultsRequest {
+  string run_id = 1;
+}
+
+message ShutdownRequest {
+  bool graceful = 1;
+}
+
+message ShutdownResponse {
+  bool success = 1;
+}
+
+service SimAdapter {
+  // Initialize sends the full scenario to the adapter before running.
+  rpc Initialize(ScenarioProto) returns (InitResponse);
+
+  // Run kicks off the simulation; the adapter executes asynchronously.
+  rpc Run(RunRequest) returns (RunResponse);
+
+  // GetResults is called after Run completes to retrieve normalized output.
+  rpc GetResults(ResultsRequest) returns (SimResultsProto);
+
+  // Shutdown signals the adapter to clean up and exit.
+  rpc Shutdown(ShutdownRequest) returns (ShutdownResponse);
+
+  // StreamState is reserved for future live-state streaming; not in v1.
+  // rpc StreamState(RunRequest) returns (stream EntityUpdate);
+}
