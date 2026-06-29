@@ -69,8 +69,27 @@ All five `.proto` files live in `proto/` and are the canonical source of truth f
 - [x] Go backend scaffold + SQLite store
 - [x] REST API (scenario CRUD, run lifecycle, results)
 - [x] Frontend scaffold (Vite + React + CesiumJS + Zustand)
-- [ ] Custom engine adapter (Go — reference implementation)
-- [ ] Orchestrator (spawn adapter, run scenario, retrieve results)
+- [x] Custom engine adapter (Go — reference implementation, gRPC `SimAdapter`)
+- [x] Adapter registry (dynamic registration, no hardcoded engine list)
+- [x] Orchestrator (registry lookup → gRPC Initialize/Run/GetResults → normalize → persist)
 - [ ] Results + playback (entity track scrubbing on Cesium)
 - [ ] Mission config panels
 - [ ] Layer/engine filter controls
+
+## End-to-end run flow (working today)
+
+```
+POST /api/v1/scenarios            create a scenario (entities + missions)
+POST /api/v1/scenarios/{id}/runs  trigger a run on an engine
+        │
+        ▼ orchestrator
+  registry lookup → gRPC dial adapter → Initialize → Run → GetResults
+        │
+        ▼ normalizer → SQLite
+GET  /api/v1/runs/{runID}          poll status (pending→running→completed)
+GET  /api/v1/runs/{runID}/results  entity tracks, events, kill chains, MOEs
+```
+
+The custom-engine adapter is a standalone gRPC sidecar that self-registers with
+the backend on startup (`POST /api/v1/adapters`). Run a full local stack with
+`make dev`, or just the backend + adapter and drive it over REST.

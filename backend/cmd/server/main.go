@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 
 	"github.com/usip/backend/internal/api"
+	"github.com/usip/backend/internal/orchestrator"
+	"github.com/usip/backend/internal/registry"
 	"github.com/usip/backend/internal/store"
 )
 
@@ -33,7 +35,9 @@ func main() {
 		log.Fatalf("store: %v", err)
 	}
 
-	router := api.NewRouter(st)
+	reg := registry.New()
+	orch := orchestrator.New(st, reg)
+	router := api.NewRouter(st, reg, orch)
 
 	log.Printf("USIP backend listening on %s  db=%s", *addr, *dbPath)
 	if err := http.ListenAndServe(*addr, router); err != nil {

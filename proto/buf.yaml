@@ -1,10 +1,18 @@
 version: v1
 name: buf.build/usip/usip
-deps:
-  - buf.build/googleapis/googleapis
 breaking:
   use:
     - FILE
 lint:
   use:
-    - DEFAULT
+    - STANDARD
+  except:
+    # Our package is usip.v1 but lives flat in proto/ — don't enforce dir layout.
+    - PACKAGE_DIRECTORY_MATCH
+    # The adapter contract names (SimAdapter, ScenarioProto, InitResponse,
+    # ResultsRequest, SimResultsProto) are fixed by the project brief. Keep them
+    # rather than forcing buf's Service/Request/Response suffix conventions.
+    - SERVICE_SUFFIX
+    - RPC_REQUEST_STANDARD_NAME
+    - RPC_RESPONSE_STANDARD_NAME
+    - RPC_REQUEST_RESPONSE_UNIQUE

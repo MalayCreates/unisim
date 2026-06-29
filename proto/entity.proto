@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package usip.v1;
 
-option go_package = "github.com/usip/backend/internal/schema;schema";
+option go_package = "github.com/usip/backend/schema;schema";
 
 // EntityType enumerates every physical platform the platform can represent.
 enum EntityType {
