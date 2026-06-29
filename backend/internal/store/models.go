@@ -102,18 +102,18 @@ type TerrainReference struct {
 }
 
 type Scenario struct {
-	ID          string           `json:"id"`
-	Name        string           `json:"name"`
-	Description string           `json:"description"`
-	Sides       []ScenarioSide   `json:"sides"`
-	Entities    []Entity         `json:"entities"`
-	Missions    []EntityMission  `json:"missions"`
-	StartTime   time.Time        `json:"start_time"`
-	DurationS   uint32           `json:"duration_s"`
+	ID          string            `json:"id"`
+	Name        string            `json:"name"`
+	Description string            `json:"description"`
+	Sides       []ScenarioSide    `json:"sides"`
+	Entities    []Entity          `json:"entities"`
+	Missions    []EntityMission   `json:"missions"`
+	StartTime   time.Time         `json:"start_time"`
+	DurationS   uint32            `json:"duration_s"`
 	Terrain     *TerrainReference `json:"terrain,omitempty"`
-	EngineHint  string           `json:"engine_hint"`
-	CreatedAt   time.Time        `json:"created_at"`
-	UpdatedAt   time.Time        `json:"updated_at"`
+	EngineHint  string            `json:"engine_hint"`
+	CreatedAt   time.Time         `json:"created_at"`
+	UpdatedAt   time.Time         `json:"updated_at"`
 }
 
 type RunStatus string
@@ -153,11 +153,11 @@ type EntityTrack struct {
 type EventType string
 
 const (
-	EventTypeDetection      EventType = "detection"
-	EventTypeEngagement     EventType = "engagement"
-	EventTypeKill           EventType = "kill"
-	EventTypeDamage         EventType = "damage"
-	EventTypeLaunch         EventType = "launch"
+	EventTypeDetection       EventType = "detection"
+	EventTypeEngagement      EventType = "engagement"
+	EventTypeKill            EventType = "kill"
+	EventTypeDamage          EventType = "damage"
+	EventTypeLaunch          EventType = "launch"
 	EventTypeWaypointReached EventType = "waypoint_reached"
 	EventTypeMissionComplete EventType = "mission_complete"
 )

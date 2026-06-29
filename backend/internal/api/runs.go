@@ -12,7 +12,8 @@ import (
 )
 
 type runHandler struct {
-	st store.Store
+	st     store.Store
+	runner Runner
 }
 
 type triggerRunRequest struct {
@@ -52,6 +53,11 @@ func (h *runHandler) trigger(w http.ResponseWriter, r *http.Request) {
 	if err := h.st.CreateRun(r.Context(), run); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
+	}
+
+	// Hand off to the orchestrator for asynchronous execution.
+	if h.runner != nil {
+		h.runner.Submit(run.ID)
 	}
 	writeJSON(w, http.StatusAccepted, run)
 }

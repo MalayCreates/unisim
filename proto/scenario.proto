@@ -2,9 +2,10 @@ syntax = "proto3";
 
 package usip.v1;
 
-option go_package = "github.com/usip/backend/internal/schema;schema";
+option go_package = "github.com/usip/backend/schema;schema";
 
 import "entity.proto";
+import "mission.proto";
 import "google/protobuf/timestamp.proto";
 
 message ScenarioSide {
@@ -32,4 +33,7 @@ message ScenarioProto {
   TerrainReference terrain = 8;
   // Hint to the orchestrator — which adapter to route this scenario to.
   string engine_hint = 9;
+  // Per-entity missions (waypoints, ROE, objectives). Embedded here so the
+  // ScenarioProto delivered to an adapter via Initialize() is self-contained.
+  repeated EntityMission missions = 10;
 }

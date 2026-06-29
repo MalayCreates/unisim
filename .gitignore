@@ -1,9 +1,11 @@
 # Go
 bin/
 backend/vendor/
+# Compiled adapter binary (built via `go build`/`go run` in the adapter dir)
+adapters/custom-engine/custom-engine
 
 # Proto generated code (regenerate with make proto)
-backend/internal/schema/*.go
+backend/schema/*.go
 adapters/panopticon/proto/
 frontend/src/proto/
 
