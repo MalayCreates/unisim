@@ -50,6 +50,14 @@ func (r *Registry) Get(engineID string) (Adapter, bool) {
 	return a, ok
 }
 
+// Has reports whether an adapter is currently registered for engineID.
+func (r *Registry) Has(engineID string) bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	_, ok := r.adapters[engineID]
+	return ok
+}
+
 // Deregister removes an adapter (e.g. on graceful shutdown).
 func (r *Registry) Deregister(engineID string) {
 	r.mu.Lock()

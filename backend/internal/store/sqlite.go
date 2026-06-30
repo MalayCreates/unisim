@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -26,6 +27,9 @@ CREATE TABLE IF NOT EXISTS runs (
 	engine_id   TEXT NOT NULL,
 	status      TEXT NOT NULL DEFAULT 'pending',
 	error       TEXT NOT NULL DEFAULT '',
+	priority    INTEGER NOT NULL DEFAULT 0,
+	worker_id   TEXT NOT NULL DEFAULT '',
+	claimed_at  DATETIME,
 	created_at  DATETIME NOT NULL,
 	updated_at  DATETIME NOT NULL
 );
@@ -56,7 +60,27 @@ func NewSQLite(path string) (Store, error) {
 	if _, err := db.Exec(schema); err != nil {
 		return nil, fmt.Errorf("migrate sqlite: %w", err)
 	}
+	if err := migrateRuns(db); err != nil {
+		return nil, fmt.Errorf("migrate runs: %w", err)
+	}
 	return &sqliteStore{db: db}, nil
+}
+
+// migrateRuns adds queue columns to pre-existing runs tables. SQLite has no
+// "ADD COLUMN IF NOT EXISTS", so we run each ALTER and tolerate the
+// duplicate-column error on databases that already have them.
+func migrateRuns(db *sql.DB) error {
+	alters := []string{
+		`ALTER TABLE runs ADD COLUMN priority INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE runs ADD COLUMN worker_id TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE runs ADD COLUMN claimed_at DATETIME`,
+	}
+	for _, stmt := range alters {
+		if _, err := db.Exec(stmt); err != nil && !strings.Contains(err.Error(), "duplicate column name") {
+			return err
+		}
+	}
+	return nil
 }
 
 // --- Scenario CRUD ---
@@ -141,24 +165,24 @@ func (s *sqliteStore) DeleteScenario(ctx context.Context, id string) error {
 
 func (s *sqliteStore) CreateRun(ctx context.Context, r *Run) error {
 	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO runs (id, scenario_id, engine_id, status, error, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		r.ID, r.ScenarioID, r.EngineID, string(r.Status), r.Error, r.CreatedAt, r.UpdatedAt,
+		`INSERT INTO runs (id, scenario_id, engine_id, status, error, priority, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		r.ID, r.ScenarioID, r.EngineID, string(r.Status), r.Error, r.Priority, r.CreatedAt, r.UpdatedAt,
 	)
 	return err
 }
 
+const runColumns = `id, scenario_id, engine_id, status, error, priority, worker_id, claimed_at, created_at, updated_at`
+
 func (s *sqliteStore) GetRun(ctx context.Context, id string) (*Run, error) {
 	row := s.db.QueryRowContext(ctx,
-		`SELECT id, scenario_id, engine_id, status, error, created_at, updated_at
-		 FROM runs WHERE id = ?`, id)
+		`SELECT `+runColumns+` FROM runs WHERE id = ?`, id)
 	return scanRun(row)
 }
 
 func (s *sqliteStore) ListRunsForScenario(ctx context.Context, scenarioID string) ([]*Run, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, scenario_id, engine_id, status, error, created_at, updated_at
-		 FROM runs WHERE scenario_id = ? ORDER BY created_at DESC`, scenarioID)
+		`SELECT `+runColumns+` FROM runs WHERE scenario_id = ? ORDER BY created_at DESC`, scenarioID)
 	if err != nil {
 		return nil, err
 	}
@@ -172,6 +196,60 @@ func (s *sqliteStore) ListRunsForScenario(ctx context.Context, scenarioID string
 		out = append(out, r)
 	}
 	return out, rows.Err()
+}
+
+// ListQueuedRuns returns pending runs in dispatch order: highest priority
+// first, then oldest first.
+func (s *sqliteStore) ListQueuedRuns(ctx context.Context, limit int) ([]*Run, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT `+runColumns+` FROM runs WHERE status = ?
+		 ORDER BY priority DESC, created_at ASC LIMIT ?`,
+		string(RunStatusPending), limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []*Run
+	for rows.Next() {
+		r, err := scanRun(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
+// ClaimRun atomically moves a run from pending to running. The WHERE guard on
+// status makes the claim safe against concurrent dispatchers: only one UPDATE
+// can match, so only one caller sees rowsAffected == 1.
+func (s *sqliteStore) ClaimRun(ctx context.Context, id, workerID string) (bool, error) {
+	now := time.Now().UTC()
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE runs SET status = ?, worker_id = ?, claimed_at = ?, updated_at = ?
+		 WHERE id = ? AND status = ?`,
+		string(RunStatusRunning), workerID, now, now, id, string(RunStatusPending),
+	)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n == 1, nil
+}
+
+// RequeueRunningRuns resets interrupted runs (status running) back to pending
+// so the dispatcher re-runs them after a restart.
+func (s *sqliteStore) RequeueRunningRuns(ctx context.Context) (int, error) {
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE runs SET status = ?, worker_id = '', claimed_at = NULL, updated_at = ?
+		 WHERE status = ?`,
+		string(RunStatusPending), time.Now().UTC(), string(RunStatusRunning),
+	)
+	if err != nil {
+		return 0, err
+	}
+	n, _ := res.RowsAffected()
+	return int(n), nil
 }
 
 func (s *sqliteStore) UpdateRunStatus(ctx context.Context, id string, status RunStatus, errMsg string) error {
@@ -224,8 +302,10 @@ type scanner interface {
 func scanRun(s scanner) (*Run, error) {
 	var r Run
 	var status string
+	var claimedAt sql.NullTime
 	var createdAt, updatedAt time.Time
-	err := s.Scan(&r.ID, &r.ScenarioID, &r.EngineID, &status, &r.Error, &createdAt, &updatedAt)
+	err := s.Scan(&r.ID, &r.ScenarioID, &r.EngineID, &status, &r.Error,
+		&r.Priority, &r.WorkerID, &claimedAt, &createdAt, &updatedAt)
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
 	}
@@ -233,6 +313,9 @@ func scanRun(s scanner) (*Run, error) {
 		return nil, err
 	}
 	r.Status = RunStatus(status)
+	if claimedAt.Valid {
+		r.ClaimedAt = &claimedAt.Time
+	}
 	r.CreatedAt = createdAt
 	r.UpdatedAt = updatedAt
 	return &r, nil

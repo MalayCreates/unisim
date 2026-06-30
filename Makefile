@@ -1,8 +1,13 @@
-.PHONY: proto build test dev backend adapter stack seed install-frontend frontend clean
+.PHONY: proto proto-py build test test-py dev backend adapter stack seed seed-hormuz install-frontend frontend clean
 
-# Generate Go + Python + TypeScript stubs from proto/
+# Generate Go stubs (buf) and Python stubs (grpcio-tools) from proto/
 proto:
 	./scripts/gen-proto.sh
+	./scripts/gen-proto-py.sh
+
+# Generate only the Python stubs (adapters/_proto/)
+proto-py:
+	./scripts/gen-proto-py.sh
 
 # Build the backend binary
 build:
@@ -12,6 +17,11 @@ build:
 test:
 	cd backend && go test ./...
 	cd adapters/custom-engine && go test ./...
+
+# Run Python adapter tests (DIS listener + panopticon engine). Needs proto-py.
+test-py:
+	cd adapters/shared && python3 -m unittest test_dis
+	python3 adapters/panopticon/test_engine.py
 
 # Start backend + adapter + frontend together (one terminal)
 dev:
@@ -34,9 +44,13 @@ stack:
 	(cd adapters/custom-engine && go run . -addr :50051 -host localhost -port 50051 -backend http://localhost:8080) & \
 	wait
 
-# Seed the running backend with the sample scenario
+# Seed the running backend with the simple sample scenario
 seed:
 	./scripts/seed.sh
+
+# Seed the running backend with the complex Strait of Hormuz scenario
+seed-hormuz:
+	./scripts/seed.sh http://localhost:8080 ./scripts/scenario-hormuz.json
 
 # Install frontend dependencies
 install-frontend:
@@ -49,5 +63,6 @@ frontend:
 clean:
 	rm -rf bin/
 	rm -rf backend/schema/*.go
+	rm -rf adapters/_proto/
 	rm -rf adapters/panopticon/proto/
 	rm -rf frontend/src/proto/

@@ -23,5 +23,13 @@ frontend/dist/
 .env
 .env.local
 
+# Local runner config (spawn-on-demand); commit runner_config.json.example instead
+runner_config.json
+
+# Python adapter artifacts
+adapters/_proto/
+**/__pycache__/
+.venv/
+
 # macOS
 .DS_Store

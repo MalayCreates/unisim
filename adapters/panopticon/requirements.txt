@@ -1,0 +1,12 @@
+# Runtime deps for the Panopticon adapter (built-in placeholder engine).
+grpcio>=1.60
+protobuf>=4.25
+
+# Needed only to regenerate the proto stubs (make proto-py):
+grpcio-tools>=1.60
+
+# The real Panopticon engine (optional; required only for --backend-engine panopticon).
+# Install from https://github.com/Panopticon-AI-team/panopticon then implement the
+# seams in translator.py / normalizer.py / engine.py.
+# gymnasium>=0.29
+# panopticon

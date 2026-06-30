@@ -30,19 +30,12 @@ func New(st store.Store, reg *registry.Registry) *Orchestrator {
 	return &Orchestrator{st: st, reg: reg}
 }
 
-// Submit executes a run asynchronously. It returns immediately; progress is
-// reflected in the run's status in the store.
-func (o *Orchestrator) Submit(runID string) {
-	go func() {
-		if err := o.execute(runID); err != nil {
-			log.Printf("run %s failed: %v", runID, err)
-			_ = o.st.UpdateRunStatus(context.Background(), runID, store.RunStatusFailed, err.Error())
-		}
-	}()
-}
-
-func (o *Orchestrator) execute(runID string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), runTimeout)
+// Execute drives a single run synchronously through the full adapter contract
+// (Initialize -> Run -> GetResults), normalizes the output, and persists it.
+// The dispatch queue calls this from a worker goroutine. On success the run is
+// marked completed here; on error the caller records the failed status.
+func (o *Orchestrator) Execute(ctx context.Context, runID string) error {
+	ctx, cancel := context.WithTimeout(ctx, runTimeout)
 	defer cancel()
 
 	run, err := o.st.GetRun(ctx, runID)

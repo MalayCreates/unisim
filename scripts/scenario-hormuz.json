@@ -1,0 +1,213 @@
+{
+  "name": "Strait of Hormuz — SEAD + Strike Package",
+  "description": "A multi-phase blue air/naval package contests the Strait of Hormuz across three loosely-separated engagements: SEAD fighters ingress first to suppress central coastal SAM sites; CAP fighters screen the center against red interceptors; and strike fighters hold offshore, then push northwest to attack a red frigate sheltered in a western naval pocket with its escorts. An ISR UAV (weapons-hold) maintains the air picture while a blue command ship stands off to the south. Exercises multi-waypoint routing, phased starts (via initial-waypoint holds), mixed ROE, detection, engagement, kill chains, MOEs, and playback.",
+  "duration_s": 1800,
+  "engine_hint": "custom-engine",
+  "sides": [
+    { "affiliation": "friendly", "label": "Blue Force (Coalition)" },
+    { "affiliation": "enemy", "label": "Red Force (Coastal Defense)" }
+  ],
+  "terrain": {
+    "min_lat": 25.2,
+    "max_lat": 27.1,
+    "min_lon": 55.7,
+    "max_lon": 57.6,
+    "description": "Strait of Hormuz and approaches (Gulf of Oman to the southeast)"
+  },
+  "entities": [
+    { "id": "blue-sead-1", "name": "Weasel 1", "type": "fixed_wing", "side": "friendly", "position": { "lat": 25.90, "lon": 57.00, "alt_m": 8000 } },
+    { "id": "blue-sead-2", "name": "Weasel 2", "type": "fixed_wing", "side": "friendly", "position": { "lat": 25.95, "lon": 56.90, "alt_m": 8000 } },
+    { "id": "blue-strike-1", "name": "Hammer 1", "type": "fixed_wing", "side": "friendly", "position": { "lat": 25.70, "lon": 57.30, "alt_m": 9000 } },
+    { "id": "blue-strike-2", "name": "Hammer 2", "type": "fixed_wing", "side": "friendly", "position": { "lat": 25.75, "lon": 57.35, "alt_m": 9000 } },
+    { "id": "blue-cap-1", "name": "Shield 1", "type": "fixed_wing", "side": "friendly", "position": { "lat": 25.80, "lon": 57.10, "alt_m": 10000 } },
+    { "id": "blue-cap-2", "name": "Shield 2", "type": "fixed_wing", "side": "friendly", "position": { "lat": 25.85, "lon": 57.20, "alt_m": 10000 } },
+    { "id": "blue-isr", "name": "Overwatch", "type": "uav", "side": "friendly", "position": { "lat": 25.70, "lon": 57.45, "alt_m": 12000 } },
+    { "id": "blue-c2", "name": "USS Vanguard", "type": "surface_vessel", "side": "friendly", "position": { "lat": 25.40, "lon": 57.50, "alt_m": 0 } },
+
+    { "id": "red-sam-1", "name": "SA-Site Alpha", "type": "ground_vehicle", "side": "enemy", "position": { "lat": 26.65, "lon": 56.55, "alt_m": 0 } },
+    { "id": "red-sam-2", "name": "SA-Site Bravo", "type": "ground_vehicle", "side": "enemy", "position": { "lat": 26.72, "lon": 56.45, "alt_m": 0 } },
+    { "id": "red-int-1", "name": "Falcon 1", "type": "fixed_wing", "side": "enemy", "position": { "lat": 26.70, "lon": 56.70, "alt_m": 9000 } },
+    { "id": "red-int-2", "name": "Falcon 2", "type": "fixed_wing", "side": "enemy", "position": { "lat": 26.75, "lon": 56.60, "alt_m": 9000 } },
+    { "id": "red-fac-1", "name": "FAC Tiger", "type": "surface_vessel", "side": "enemy", "position": { "lat": 26.84, "lon": 55.95, "alt_m": 0 } },
+    { "id": "red-fac-2", "name": "FAC Cobra", "type": "surface_vessel", "side": "enemy", "position": { "lat": 26.80, "lon": 56.08, "alt_m": 0 } },
+    { "id": "red-frigate", "name": "Red Frigate Saif", "type": "surface_vessel", "side": "enemy", "position": { "lat": 26.88, "lon": 56.02, "alt_m": 0 } }
+  ],
+  "missions": [
+    {
+      "entity_id": "blue-sead-1",
+      "mission_type": "strike",
+      "roe": "weapons_free",
+      "waypoints": [
+        { "lat": 26.20, "lon": 56.70, "alt_m": 6000, "speed_ms": 250, "hold_time_s": 0 },
+        { "lat": 26.52, "lon": 56.57, "alt_m": 5000, "speed_ms": 220, "hold_time_s": 30 },
+        { "lat": 26.20, "lon": 56.95, "alt_m": 7000, "speed_ms": 260, "hold_time_s": 0 }
+      ],
+      "objectives": ["Suppress SA-Site Alpha", "Egress to the southeast"],
+      "timeline": { "start_offset_s": 0, "expected_duration_s": 1800 }
+    },
+    {
+      "entity_id": "blue-sead-2",
+      "mission_type": "strike",
+      "roe": "weapons_free",
+      "waypoints": [
+        { "lat": 26.30, "lon": 56.60, "alt_m": 6000, "speed_ms": 250, "hold_time_s": 0 },
+        { "lat": 26.60, "lon": 56.47, "alt_m": 5000, "speed_ms": 220, "hold_time_s": 30 },
+        { "lat": 26.30, "lon": 56.85, "alt_m": 7000, "speed_ms": 260, "hold_time_s": 0 }
+      ],
+      "objectives": ["Suppress SA-Site Bravo", "Egress to the southeast"],
+      "timeline": { "start_offset_s": 0, "expected_duration_s": 1800 }
+    },
+    {
+      "entity_id": "blue-strike-1",
+      "mission_type": "strike",
+      "roe": "weapons_free",
+      "waypoints": [
+        { "lat": 25.70, "lon": 57.30, "alt_m": 9000, "speed_ms": 200, "hold_time_s": 300 },
+        { "lat": 26.30, "lon": 56.40, "alt_m": 6000, "speed_ms": 270, "hold_time_s": 0 },
+        { "lat": 26.82, "lon": 56.06, "alt_m": 4000, "speed_ms": 250, "hold_time_s": 20 },
+        { "lat": 26.40, "lon": 56.55, "alt_m": 7000, "speed_ms": 280, "hold_time_s": 0 }
+      ],
+      "objectives": ["Hold until SEAD complete", "Destroy Red Frigate Saif"],
+      "timeline": { "start_offset_s": 300, "expected_duration_s": 1500 }
+    },
+    {
+      "entity_id": "blue-strike-2",
+      "mission_type": "strike",
+      "roe": "weapons_free",
+      "waypoints": [
+        { "lat": 25.75, "lon": 57.35, "alt_m": 9000, "speed_ms": 200, "hold_time_s": 300 },
+        { "lat": 26.35, "lon": 56.35, "alt_m": 6000, "speed_ms": 270, "hold_time_s": 0 },
+        { "lat": 26.86, "lon": 56.00, "alt_m": 4000, "speed_ms": 250, "hold_time_s": 20 },
+        { "lat": 26.45, "lon": 56.50, "alt_m": 7000, "speed_ms": 280, "hold_time_s": 0 }
+      ],
+      "objectives": ["Hold until SEAD complete", "Destroy Red Frigate Saif"],
+      "timeline": { "start_offset_s": 300, "expected_duration_s": 1500 }
+    },
+    {
+      "entity_id": "blue-cap-1",
+      "mission_type": "cap",
+      "roe": "weapons_tight",
+      "waypoints": [
+        { "lat": 26.10, "lon": 56.85, "alt_m": 10000, "speed_ms": 230, "hold_time_s": 0 },
+        { "lat": 26.35, "lon": 56.95, "alt_m": 10000, "speed_ms": 230, "hold_time_s": 0 },
+        { "lat": 26.20, "lon": 57.10, "alt_m": 10000, "speed_ms": 230, "hold_time_s": 0 },
+        { "lat": 26.00, "lon": 56.95, "alt_m": 10000, "speed_ms": 230, "hold_time_s": 0 }
+      ],
+      "objectives": ["Screen the strike package", "Engage red interceptors"],
+      "timeline": { "start_offset_s": 0, "expected_duration_s": 1800 }
+    },
+    {
+      "entity_id": "blue-cap-2",
+      "mission_type": "cap",
+      "roe": "weapons_tight",
+      "waypoints": [
+        { "lat": 26.15, "lon": 56.90, "alt_m": 10500, "speed_ms": 230, "hold_time_s": 0 },
+        { "lat": 26.40, "lon": 57.00, "alt_m": 10500, "speed_ms": 230, "hold_time_s": 0 },
+        { "lat": 26.25, "lon": 57.15, "alt_m": 10500, "speed_ms": 230, "hold_time_s": 0 },
+        { "lat": 26.05, "lon": 57.00, "alt_m": 10500, "speed_ms": 230, "hold_time_s": 0 }
+      ],
+      "objectives": ["Screen the strike package", "Engage red interceptors"],
+      "timeline": { "start_offset_s": 0, "expected_duration_s": 1800 }
+    },
+    {
+      "entity_id": "blue-isr",
+      "mission_type": "recon",
+      "roe": "weapons_hold",
+      "waypoints": [
+        { "lat": 26.00, "lon": 57.10, "alt_m": 12000, "speed_ms": 90, "hold_time_s": 0 },
+        { "lat": 26.20, "lon": 57.30, "alt_m": 12000, "speed_ms": 90, "hold_time_s": 0 },
+        { "lat": 25.95, "lon": 57.45, "alt_m": 12000, "speed_ms": 90, "hold_time_s": 0 },
+        { "lat": 25.80, "lon": 57.20, "alt_m": 12000, "speed_ms": 90, "hold_time_s": 0 }
+      ],
+      "objectives": ["Maintain the air picture", "Do not engage"],
+      "timeline": { "start_offset_s": 0, "expected_duration_s": 1800 }
+    },
+    {
+      "entity_id": "blue-c2",
+      "mission_type": "patrol",
+      "roe": "weapons_tight",
+      "waypoints": [
+        { "lat": 25.50, "lon": 57.35, "alt_m": 0, "speed_ms": 11, "hold_time_s": 0 },
+        { "lat": 25.55, "lon": 57.20, "alt_m": 0, "speed_ms": 11, "hold_time_s": 0 }
+      ],
+      "objectives": ["Command and control", "Hold standoff station"],
+      "timeline": { "start_offset_s": 0, "expected_duration_s": 1800 }
+    },
+    {
+      "entity_id": "red-sam-1",
+      "mission_type": "patrol",
+      "roe": "weapons_tight",
+      "waypoints": [
+        { "lat": 26.65, "lon": 56.55, "alt_m": 0, "speed_ms": 0, "hold_time_s": 0 }
+      ],
+      "objectives": ["Defend the central coast"],
+      "timeline": { "start_offset_s": 0, "expected_duration_s": 1800 }
+    },
+    {
+      "entity_id": "red-sam-2",
+      "mission_type": "patrol",
+      "roe": "weapons_tight",
+      "waypoints": [
+        { "lat": 26.72, "lon": 56.45, "alt_m": 0, "speed_ms": 0, "hold_time_s": 0 }
+      ],
+      "objectives": ["Defend the central coast"],
+      "timeline": { "start_offset_s": 0, "expected_duration_s": 1800 }
+    },
+    {
+      "entity_id": "red-int-1",
+      "mission_type": "cap",
+      "roe": "weapons_tight",
+      "waypoints": [
+        { "lat": 26.45, "lon": 56.80, "alt_m": 9000, "speed_ms": 240, "hold_time_s": 0 },
+        { "lat": 26.25, "lon": 56.95, "alt_m": 9000, "speed_ms": 240, "hold_time_s": 0 },
+        { "lat": 26.50, "lon": 56.65, "alt_m": 9000, "speed_ms": 240, "hold_time_s": 0 }
+      ],
+      "objectives": ["Intercept blue aircraft"],
+      "timeline": { "start_offset_s": 0, "expected_duration_s": 1800 }
+    },
+    {
+      "entity_id": "red-int-2",
+      "mission_type": "cap",
+      "roe": "weapons_tight",
+      "waypoints": [
+        { "lat": 26.50, "lon": 56.70, "alt_m": 9500, "speed_ms": 240, "hold_time_s": 0 },
+        { "lat": 26.30, "lon": 56.88, "alt_m": 9500, "speed_ms": 240, "hold_time_s": 0 },
+        { "lat": 26.55, "lon": 56.58, "alt_m": 9500, "speed_ms": 240, "hold_time_s": 0 }
+      ],
+      "objectives": ["Intercept blue aircraft"],
+      "timeline": { "start_offset_s": 0, "expected_duration_s": 1800 }
+    },
+    {
+      "entity_id": "red-fac-1",
+      "mission_type": "patrol",
+      "roe": "weapons_tight",
+      "waypoints": [
+        { "lat": 26.82, "lon": 55.98, "alt_m": 0, "speed_ms": 14, "hold_time_s": 0 },
+        { "lat": 26.86, "lon": 55.92, "alt_m": 0, "speed_ms": 14, "hold_time_s": 0 }
+      ],
+      "objectives": ["Screen the frigate"],
+      "timeline": { "start_offset_s": 0, "expected_duration_s": 1800 }
+    },
+    {
+      "entity_id": "red-fac-2",
+      "mission_type": "patrol",
+      "roe": "weapons_tight",
+      "waypoints": [
+        { "lat": 26.78, "lon": 56.10, "alt_m": 0, "speed_ms": 14, "hold_time_s": 0 },
+        { "lat": 26.82, "lon": 56.04, "alt_m": 0, "speed_ms": 14, "hold_time_s": 0 }
+      ],
+      "objectives": ["Screen the frigate"],
+      "timeline": { "start_offset_s": 0, "expected_duration_s": 1800 }
+    },
+    {
+      "entity_id": "red-frigate",
+      "mission_type": "patrol",
+      "roe": "weapons_tight",
+      "waypoints": [
+        { "lat": 26.86, "lon": 56.04, "alt_m": 0, "speed_ms": 8, "hold_time_s": 0 }
+      ],
+      "objectives": ["Hold station under escort"],
+      "timeline": { "start_offset_s": 0, "expected_duration_s": 1800 }
+    }
+  ]
+}

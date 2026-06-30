@@ -126,14 +126,22 @@ const (
 )
 
 type Run struct {
-	ID         string    `json:"id"`
-	ScenarioID string    `json:"scenario_id"`
-	EngineID   string    `json:"engine_id"`
-	Status     RunStatus `json:"status"`
-	Error      string    `json:"error,omitempty"`
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
+	ID         string     `json:"id"`
+	ScenarioID string     `json:"scenario_id"`
+	EngineID   string     `json:"engine_id"`
+	Status     RunStatus  `json:"status"`
+	Error      string     `json:"error,omitempty"`
+	Priority   int        `json:"priority"`
+	WorkerID   string     `json:"worker_id,omitempty"`
+	ClaimedAt  *time.Time `json:"claimed_at,omitempty"`
+	CreatedAt  time.Time  `json:"created_at"`
+	UpdatedAt  time.Time  `json:"updated_at"`
 }
+
+// RunStatusQueued is the initial state for a run accepted into the dispatch
+// queue but not yet claimed by a worker. It is an alias of pending so existing
+// callers and the UI keep working; the dispatcher treats it as "ready to run".
+const RunStatusQueued = RunStatusPending
 
 type TrackPoint struct {
 	TimestampMS int64   `json:"timestamp_ms"`

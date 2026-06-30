@@ -1,0 +1,19 @@
+{
+  "_comment": "Copy to runner_config.json to enable spawn-on-demand. The backend launches these adapters automatically when a queued run targets an engine that has no live adapter. The $BACKEND_URL token is replaced with the backend's public URL at spawn time. Paths are resolved from 'workdir'.",
+  "runners": {
+    "custom-engine": {
+      "type": "process",
+      "cmd": "./bin/custom-engine",
+      "args": ["-addr", ":50051", "-host", "localhost", "-port", "50051", "-backend", "$BACKEND_URL"],
+      "workdir": ".",
+      "env": {}
+    },
+    "panopticon": {
+      "type": "process",
+      "cmd": "python3",
+      "args": ["adapters/panopticon/main.py", "--addr", ":50052", "--host", "localhost", "--port", "50052", "--backend", "$BACKEND_URL"],
+      "workdir": ".",
+      "env": {}
+    }
+  }
+}
