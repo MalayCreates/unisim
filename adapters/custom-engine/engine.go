@@ -5,6 +5,7 @@ import (
 	"hash/fnv"
 	"math"
 	"math/rand"
+	"sort"
 	"time"
 
 	"github.com/usip/backend/schema"
@@ -31,6 +32,14 @@ type engine struct {
 	events     []*schema.SimEvent
 	killChains []*schema.KillChain
 	lastEngage map[string]float64 // "attacker|target" -> last engagement sim-time
+
+	// Spatial broadphase: for large scenarios the O(n^2) pair loop dominates,
+	// so we cull far pairs with a uniform lat/lon grid. Enabled only when it's
+	// both worthwhile and safe (see shouldUseGrid); results are identical to
+	// the brute-force path (proven by TestGridMatchesBruteForce).
+	useGrid    bool
+	gridLatDeg float64 // cell height in degrees latitude
+	gridLonDeg float64 // cell width in degrees longitude
 }
 
 func newEngine(s *schema.ScenarioProto, runID string) *engine {
@@ -59,7 +68,65 @@ func newEngine(s *schema.ScenarioProto, runID string) *engine {
 		e.tracks[ent.id] = &schema.EntityTrack{EntityId: ent.id}
 		e.trackOrder = append(e.trackOrder, ent.id)
 	}
+	e.configureGrid()
 	return e
+}
+
+// gridThreshold is the entity count above which the spatial grid pays for its
+// per-step build overhead. Below it the brute-force loop is faster.
+const gridThreshold = 64
+
+// configureGrid decides whether to use the spatial broadphase and, if so,
+// computes cell sizes. It falls back to brute force for small scenarios and
+// for geometries where a uniform lat/lon grid is unsafe (antimeridian span or
+// near-polar latitudes, where degrees-of-longitude scaling breaks down).
+func (e *engine) configureGrid() {
+	if len(e.entities) < gridThreshold {
+		return
+	}
+	// maxR is the largest interaction radius any entity has; a cell sized to
+	// it guarantees every in-range pair lands in the same or an adjacent cell.
+	var maxR, maxAbsLat, minLon, maxLon float64
+	minLon, maxLon = 180, -180
+	for _, ent := range e.entities {
+		if r := math.Max(ent.sensorRangeM, ent.weaponRangeM); r > maxR {
+			maxR = r
+		}
+		if math.Abs(ent.lat) > maxAbsLat {
+			maxAbsLat = math.Abs(ent.lat)
+		}
+		if ent.lon < minLon {
+			minLon = ent.lon
+		}
+		if ent.lon > maxLon {
+			maxLon = ent.lon
+		}
+		for _, w := range ent.waypoints {
+			if math.Abs(w.lat) > maxAbsLat {
+				maxAbsLat = math.Abs(w.lat)
+			}
+			if w.lon < minLon {
+				minLon = w.lon
+			}
+			if w.lon > maxLon {
+				maxLon = w.lon
+			}
+		}
+	}
+	if maxR <= 0 || maxAbsLat > 85 || maxLon-minLon > 180 {
+		return // unsafe or pointless; keep brute force
+	}
+	// Degrees per meter: latitude is ~constant; longitude shrinks with cos(lat),
+	// so size cells using the highest latitude present (smallest cos) to
+	// guarantee every cell is at least maxR wide everywhere in the scenario.
+	metersPerDegLat := earthRadiusM * math.Pi / 180
+	metersPerDegLon := metersPerDegLat * math.Cos(maxAbsLat*math.Pi/180)
+	if metersPerDegLon <= 0 {
+		return
+	}
+	e.gridLatDeg = maxR / metersPerDegLat
+	e.gridLonDeg = maxR / metersPerDegLon
+	e.useGrid = true
 }
 
 // run executes the full simulation and returns normalized results.
@@ -129,59 +196,130 @@ func (e *engine) advance(ent *simEntity, t float64) {
 	ent.speedMS = speed
 }
 
-// interactions runs detection, engagement, and kill resolution for one step.
+// interactions runs detection, engagement, and kill resolution for one step,
+// dispatching to the brute-force or grid broadphase. Both visit attackers in
+// entity order and, per attacker, candidate targets in ascending entity index
+// order, so the RNG draw sequence — and thus the result — is identical.
 func (e *engine) interactions(t float64) {
+	if e.useGrid {
+		e.interactionsGrid(t)
+	} else {
+		e.interactionsBrute(t)
+	}
+}
+
+func (e *engine) interactionsBrute(t float64) {
 	for _, a := range e.entities {
 		if !a.alive || a.sensorRangeM <= 0 {
 			continue
 		}
 		for _, b := range e.entities {
-			if b == a || !b.alive || !areEnemies(a.side, b.side) {
-				continue
-			}
-			d := haversineM(a.lat, a.lon, b.lat, b.lon)
-
-			// Detection
-			if d <= a.sensorRangeM && !a.detected[b.id] && e.rollDetection(a, d) {
-				a.detected[b.id] = true
-				e.emit(t, schema.EventType_EVENT_TYPE_DETECTION, a.id, b.id,
-					fmt.Sprintf("detected %s at %.0f m", b.name, d))
-			}
-
-			// Engagement + kill
-			if a.weaponRangeM > 0 && a.ammo != 0 && roeAllows(a) && d <= a.weaponRangeM {
-				key := a.id + "|" + b.id
-				if t-e.lastEngage[key] < reengageCoolS && e.lastEngage[key] != 0 {
-					continue
-				}
-				e.lastEngage[key] = t
-				if a.ammo > 0 {
-					a.ammo--
-				}
-				e.emit(t, schema.EventType_EVENT_TYPE_ENGAGEMENT, a.id, b.id,
-					fmt.Sprintf("engaging %s at %.0f m", b.name, d))
-
-				if e.rng.Float64() < a.basePk {
-					b.healthHP--
-					if b.healthHP > 0 {
-						e.emit(t, schema.EventType_EVENT_TYPE_DAMAGE, a.id, b.id,
-							fmt.Sprintf("damaged %s (%.0f/%.0f HP)", b.name, b.healthHP, b.healthMaxHP))
-						continue
-					}
-					b.alive = false
-					e.emit(t, schema.EventType_EVENT_TYPE_KILL, a.id, b.id,
-						fmt.Sprintf("killed %s", b.name))
-					ts := e.ts(t)
-					e.killChains = append(e.killChains, &schema.KillChain{
-						AttackerEntityId: a.id,
-						TargetEntityId:   b.id,
-						EngagedAt:        ts,
-						KilledAt:         ts,
-					})
-				}
-			}
+			e.interact(t, a, b)
 		}
 	}
+}
+
+// interactionsGrid is the broadphase: each attacker only tests targets in its
+// own and adjacent grid cells. Since cells are sized to the largest interaction
+// radius, no in-range pair is ever missed; candidates are visited in ascending
+// entity index order to match the brute-force RNG sequence exactly.
+func (e *engine) interactionsGrid(t float64) {
+	cells := e.buildGrid()
+	for _, a := range e.entities {
+		if !a.alive || a.sensorRangeM <= 0 {
+			continue
+		}
+		for _, bi := range e.candidates(cells, a) {
+			e.interact(t, a, e.entities[bi])
+		}
+	}
+}
+
+// interact resolves detection/engagement/kill for a single ordered pair (a
+// attacking b). It is the single source of truth shared by both broadphases.
+func (e *engine) interact(t float64, a, b *simEntity) {
+	if b == a || !b.alive || !areEnemies(a.side, b.side) {
+		return
+	}
+	d := haversineM(a.lat, a.lon, b.lat, b.lon)
+
+	// Detection
+	if d <= a.sensorRangeM && !a.detected[b.id] && e.rollDetection(a, d) {
+		a.detected[b.id] = true
+		e.emit(t, schema.EventType_EVENT_TYPE_DETECTION, a.id, b.id,
+			fmt.Sprintf("detected %s at %.0f m", b.name, d))
+	}
+
+	// Engagement + kill
+	if a.weaponRangeM > 0 && a.ammo != 0 && roeAllows(a) && d <= a.weaponRangeM {
+		key := a.id + "|" + b.id
+		if t-e.lastEngage[key] < reengageCoolS && e.lastEngage[key] != 0 {
+			return
+		}
+		e.lastEngage[key] = t
+		if a.ammo > 0 {
+			a.ammo--
+		}
+		e.emit(t, schema.EventType_EVENT_TYPE_ENGAGEMENT, a.id, b.id,
+			fmt.Sprintf("engaging %s at %.0f m", b.name, d))
+
+		if e.rng.Float64() < a.basePk {
+			b.healthHP--
+			if b.healthHP > 0 {
+				e.emit(t, schema.EventType_EVENT_TYPE_DAMAGE, a.id, b.id,
+					fmt.Sprintf("damaged %s (%.0f/%.0f HP)", b.name, b.healthHP, b.healthMaxHP))
+				return
+			}
+			b.alive = false
+			e.emit(t, schema.EventType_EVENT_TYPE_KILL, a.id, b.id,
+				fmt.Sprintf("killed %s", b.name))
+			ts := e.ts(t)
+			e.killChains = append(e.killChains, &schema.KillChain{
+				AttackerEntityId: a.id,
+				TargetEntityId:   b.id,
+				EngagedAt:        ts,
+				KilledAt:         ts,
+			})
+		}
+	}
+}
+
+// gridCell keys a spatial bucket.
+type gridCell struct{ lat, lon int }
+
+// buildGrid buckets currently-alive entities into cells by position, in
+// ascending entity-index order (so each bucket is pre-sorted).
+func (e *engine) buildGrid() map[gridCell][]int {
+	cells := make(map[gridCell][]int, len(e.entities))
+	for i, ent := range e.entities {
+		if !ent.alive {
+			continue
+		}
+		c := e.cellOf(ent)
+		cells[c] = append(cells[c], i)
+	}
+	return cells
+}
+
+func (e *engine) cellOf(ent *simEntity) gridCell {
+	return gridCell{
+		lat: int(math.Floor(ent.lat / e.gridLatDeg)),
+		lon: int(math.Floor(ent.lon / e.gridLonDeg)),
+	}
+}
+
+// candidates returns the entity indices in a's own and adjacent cells, sorted
+// ascending to preserve brute-force iteration order.
+func (e *engine) candidates(cells map[gridCell][]int, a *simEntity) []int {
+	c := e.cellOf(a)
+	var out []int
+	for dlat := -1; dlat <= 1; dlat++ {
+		for dlon := -1; dlon <= 1; dlon++ {
+			out = append(out, cells[gridCell{c.lat + dlat, c.lon + dlon}]...)
+		}
+	}
+	sort.Ints(out)
+	return out
 }
 
 // rollDetection returns whether entity a detects a target at distance d
