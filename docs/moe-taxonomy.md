@@ -37,3 +37,6 @@ Notes:
   prefix) for backward compatibility with the original five keys; the
   "Category" column here is what the frontend uses to group metrics for
   display (see `frontend/src/lib/moeTaxonomy.ts`).
+- Batch runs (`POST /api/v1/scenarios/{id}/batches`, see root `README.md`)
+  aggregate these same keys across N replications (mean/stddev/min/max per
+  key) — the taxonomy and its category grouping apply identically there.

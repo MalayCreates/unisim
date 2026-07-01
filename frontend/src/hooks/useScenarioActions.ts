@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { scenariosApi, runsApi } from '../api/client';
+import { batchesApi, scenariosApi, runsApi } from '../api/client';
 import { useStore } from '../store';
 import type { Scenario } from '../types';
 
@@ -71,5 +71,44 @@ export function useScenarioActions() {
     [save],
   );
 
-  return { create, save, run };
+  // runBatch saves any pending edits, then triggers `count` independent
+  // replications of the scenario and polls until every replication finishes,
+  // loading the cross-run aggregated MOEs into the store when done.
+  const runBatch = useCallback(
+    async (engineId: string, count: number): Promise<void> => {
+      const st = useStore.getState();
+      let sc = st.activeScenario;
+      if (!sc) return;
+      if (st.dirty) {
+        await save();
+        sc = useStore.getState().activeScenario!;
+      }
+
+      st.setRunStatus('pending');
+      const { batch_id } = await batchesApi.create(sc.id, engineId, count);
+
+      return new Promise((resolve, reject) => {
+        const poll = async () => {
+          try {
+            const summary = await batchesApi.get(batch_id);
+            useStore.getState().setBatchResult(summary);
+            const finished = summary.completed + summary.failed;
+            if (finished >= summary.total) {
+              useStore.getState().setRunStatus(summary.failed > 0 ? 'failed' : 'completed');
+              resolve();
+            } else {
+              useStore.getState().setRunStatus('running');
+              setTimeout(poll, 500);
+            }
+          } catch (err) {
+            reject(err as Error);
+          }
+        };
+        poll();
+      });
+    },
+    [save],
+  );
+
+  return { create, save, run, runBatch };
 }

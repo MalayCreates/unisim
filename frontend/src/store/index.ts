@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import type {
+  BatchSummary,
   Entity,
   EntityMission,
   EntityType,
@@ -64,6 +65,10 @@ interface AppStore {
   setActiveRunId: (id: string | null) => void;
   setResults: (r: SimResults | null) => void;
 
+  // --- Batches (Monte Carlo replications) ---
+  batchResult: BatchSummary | null;
+  setBatchResult: (b: BatchSummary | null) => void;
+
   // --- Playback ---
   playing: boolean;
   playbackTimeMS: number; // relative ms from track start
@@ -108,6 +113,7 @@ export const useStore = create<AppStore>((set, get) => ({
       dirty: false,
       selectedEntityId: null,
       results: null,
+      batchResult: null,
       runStatus: null,
       activeRunId: null,
       playing: false,
@@ -217,10 +223,15 @@ export const useStore = create<AppStore>((set, get) => ({
   setResults: (results) =>
     set({
       results,
+      batchResult: null,
       playbackTimeMS: 0,
       playing: false,
       visibleEngines: results ? [results.engine_id] : [],
     }),
+
+  // --- Batches (Monte Carlo replications) ---
+  batchResult: null,
+  setBatchResult: (batchResult) => set({ batchResult, results: null }),
 
   // --- Playback ---
   playing: false,

@@ -106,3 +106,17 @@ GET  /api/v1/runs/{runID}/results  entity tracks, events, kill chains, MOEs
 The custom-engine adapter is a standalone gRPC sidecar that self-registers with
 the backend on startup (`POST /api/v1/adapters`). Run a full local stack with
 `make dev`, or just the backend + adapter and drive it over REST.
+
+### Batches (Monte Carlo replications)
+
+For stochastic scenarios, run the same scenario N times and get cross-run
+statistics instead of a single noisy outcome:
+
+```
+POST /api/v1/scenarios/{id}/batches  {"engine_id": "...", "count": N}  -> {batch_id, run_ids}
+GET  /api/v1/batches/{batchID}       per-run status + aggregated_moes (mean/stddev/min/max per MOE key)
+```
+
+Each replication is a normal run under the hood (own run ID, own RNG seed,
+scheduled through the same queue), just tagged with a shared `batch_id`. The
+frontend exposes this as a "Replications" count next to the Run button.

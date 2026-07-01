@@ -4,6 +4,7 @@ import {
   Button,
   Group,
   Indicator,
+  NumberInput,
   Select,
   Text,
   TextInput,
@@ -31,11 +32,14 @@ export default function TopBar() {
   const runStatus = useStore((s) => s.runStatus);
   const results = useStore((s) => s.results);
   const setResults = useStore((s) => s.setResults);
+  const batchResult = useStore((s) => s.batchResult);
+  const setBatchResult = useStore((s) => s.setBatchResult);
 
-  const { create, save, run } = useScenarioActions();
+  const { create, save, run, runBatch } = useScenarioActions();
 
   const [engines, setEngines] = useState<string[]>(['custom-engine']);
   const [engine, setEngine] = useState('custom-engine');
+  const [replications, setReplications] = useState<number>(1);
   const [newName, setNewName] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -128,12 +132,15 @@ export default function TopBar() {
           </Tooltip>
         )}
 
-        {results ? (
+        {results || batchResult ? (
           <Button
             size="xs"
             variant="default"
             leftSection={<IconX size={14} />}
-            onClick={() => setResults(null)}
+            onClick={() => {
+              setResults(null);
+              setBatchResult(null);
+            }}
           >
             Close results
           </Button>
@@ -158,22 +165,38 @@ export default function TopBar() {
               onChange={(v) => v && setEngine(v)}
               comboboxProps={{ withinPortal: true }}
             />
+            <Tooltip label="Replications: run this many independent copies and aggregate MOEs (Monte Carlo)">
+              <NumberInput
+                size="xs"
+                w={64}
+                min={1}
+                max={50}
+                value={replications}
+                onChange={(v) => setReplications(typeof v === 'number' ? v : 1)}
+              />
+            </Tooltip>
             <Button
               size="xs"
               color="teal"
               leftSection={<IconPlayerPlayFilled size={14} />}
               loading={running || busy}
               disabled={!activeScenario || (activeScenario.entities.length === 0)}
-              onClick={() => guard(() => run(engine))}
+              onClick={() =>
+                guard(() =>
+                  replications > 1 ? runBatch(engine, replications) : run(engine),
+                )
+              }
             >
-              Run
+              {replications > 1 ? `Run ${replications}×` : 'Run'}
             </Button>
           </>
         )}
 
         {runStatus && (
           <Badge color={STATUS_COLOR[runStatus]} variant="light" size="lg">
-            {runStatus}
+            {batchResult && runStatus === 'running'
+              ? `${batchResult.completed + batchResult.failed}/${batchResult.total}`
+              : runStatus}
           </Badge>
         )}
       </Group>

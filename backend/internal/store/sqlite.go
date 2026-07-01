@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS runs (
 	priority    INTEGER NOT NULL DEFAULT 0,
 	worker_id   TEXT NOT NULL DEFAULT '',
 	claimed_at  DATETIME,
+	batch_id    TEXT NOT NULL DEFAULT '',
 	created_at  DATETIME NOT NULL,
 	updated_at  DATETIME NOT NULL
 );
@@ -63,6 +64,11 @@ func NewSQLite(path string) (Store, error) {
 	if err := migrateRuns(db); err != nil {
 		return nil, fmt.Errorf("migrate runs: %w", err)
 	}
+	// Indexes on columns added by migrateRuns must be created after it runs,
+	// so pre-existing databases have the column before SQLite indexes it.
+	if _, err := db.Exec(`CREATE INDEX IF NOT EXISTS idx_runs_batch ON runs(batch_id)`); err != nil {
+		return nil, fmt.Errorf("index runs.batch_id: %w", err)
+	}
 	return &sqliteStore{db: db}, nil
 }
 
@@ -74,6 +80,7 @@ func migrateRuns(db *sql.DB) error {
 		`ALTER TABLE runs ADD COLUMN priority INTEGER NOT NULL DEFAULT 0`,
 		`ALTER TABLE runs ADD COLUMN worker_id TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE runs ADD COLUMN claimed_at DATETIME`,
+		`ALTER TABLE runs ADD COLUMN batch_id TEXT NOT NULL DEFAULT ''`,
 	}
 	for _, stmt := range alters {
 		if _, err := db.Exec(stmt); err != nil && !strings.Contains(err.Error(), "duplicate column name") {
@@ -165,14 +172,14 @@ func (s *sqliteStore) DeleteScenario(ctx context.Context, id string) error {
 
 func (s *sqliteStore) CreateRun(ctx context.Context, r *Run) error {
 	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO runs (id, scenario_id, engine_id, status, error, priority, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		r.ID, r.ScenarioID, r.EngineID, string(r.Status), r.Error, r.Priority, r.CreatedAt, r.UpdatedAt,
+		`INSERT INTO runs (id, scenario_id, engine_id, status, error, priority, batch_id, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		r.ID, r.ScenarioID, r.EngineID, string(r.Status), r.Error, r.Priority, r.BatchID, r.CreatedAt, r.UpdatedAt,
 	)
 	return err
 }
 
-const runColumns = `id, scenario_id, engine_id, status, error, priority, worker_id, claimed_at, created_at, updated_at`
+const runColumns = `id, scenario_id, engine_id, status, error, priority, worker_id, claimed_at, batch_id, created_at, updated_at`
 
 func (s *sqliteStore) GetRun(ctx context.Context, id string) (*Run, error) {
 	row := s.db.QueryRowContext(ctx,
@@ -183,6 +190,25 @@ func (s *sqliteStore) GetRun(ctx context.Context, id string) (*Run, error) {
 func (s *sqliteStore) ListRunsForScenario(ctx context.Context, scenarioID string) ([]*Run, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT `+runColumns+` FROM runs WHERE scenario_id = ? ORDER BY created_at DESC`, scenarioID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []*Run
+	for rows.Next() {
+		r, err := scanRun(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
+// ListRunsForBatch returns all runs sharing a batch_id, in creation order.
+func (s *sqliteStore) ListRunsForBatch(ctx context.Context, batchID string) ([]*Run, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT `+runColumns+` FROM runs WHERE batch_id = ? ORDER BY created_at ASC`, batchID)
 	if err != nil {
 		return nil, err
 	}
@@ -305,7 +331,7 @@ func scanRun(s scanner) (*Run, error) {
 	var claimedAt sql.NullTime
 	var createdAt, updatedAt time.Time
 	err := s.Scan(&r.ID, &r.ScenarioID, &r.EngineID, &status, &r.Error,
-		&r.Priority, &r.WorkerID, &claimedAt, &createdAt, &updatedAt)
+		&r.Priority, &r.WorkerID, &claimedAt, &r.BatchID, &createdAt, &updatedAt)
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
 	}

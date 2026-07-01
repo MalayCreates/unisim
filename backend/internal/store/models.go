@@ -134,8 +134,11 @@ type Run struct {
 	Priority   int        `json:"priority"`
 	WorkerID   string     `json:"worker_id,omitempty"`
 	ClaimedAt  *time.Time `json:"claimed_at,omitempty"`
-	CreatedAt  time.Time  `json:"created_at"`
-	UpdatedAt  time.Time  `json:"updated_at"`
+	// BatchID groups runs created together as Monte Carlo replications of the
+	// same scenario (see api.batchHandler). Empty for a standalone run.
+	BatchID   string    `json:"batch_id,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // RunStatusQueued is the initial state for a run accepted into the dispatch

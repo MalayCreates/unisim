@@ -3,12 +3,12 @@ import { Badge, Group, ScrollArea, Stack, Table, Tabs, Text } from '@mantine/cor
 import { useStore } from '../../store';
 import { resultsTimeRange } from '../../lib/playback';
 import { MOE_CATEGORY_LABEL, moeCategory, moeLabel, type MOECategory } from '../../lib/moeTaxonomy';
-import type { EventType, MOEMetric } from '../../types';
+import type { BatchMOEAggregate, EventType, RunStatus } from '../../types';
 
 const MOE_CATEGORY_ORDER: MOECategory[] = ['attrition', 'effectiveness', 'sensor', 'logistics'];
 
-function groupMOEsByCategory(metrics: MOEMetric[]): [MOECategory, MOEMetric[]][] {
-  const groups = new Map<MOECategory, MOEMetric[]>();
+function groupByCategory<T extends { key: string }>(metrics: T[]): [MOECategory, T[]][] {
+  const groups = new Map<MOECategory, T[]>();
   for (const mt of metrics) {
     const cat = moeCategory(mt.key);
     if (!groups.has(cat)) groups.set(cat, []);
@@ -33,8 +33,109 @@ const EVENT_COLOR: Record<EventType, string> = {
   mission_complete: 'teal',
 };
 
+const RUN_STATUS_COLOR: Record<RunStatus, string> = {
+  pending: 'yellow',
+  running: 'blue',
+  completed: 'teal',
+  failed: 'red',
+};
+
+function BatchMOETable({ metrics }: { metrics: BatchMOEAggregate[] }) {
+  return (
+    <Stack gap="sm">
+      {groupByCategory(metrics).map(([cat, group]) => (
+        <div key={cat}>
+          <Text size="10px" fw={700} c="dimmed" tt="uppercase" mb={2}>
+            {MOE_CATEGORY_LABEL[cat]}
+          </Text>
+          <Table withRowBorders={false} verticalSpacing={4}>
+            <Table.Tbody>
+              {group.map((agg) => (
+                <Table.Tr key={agg.key}>
+                  <Table.Td>
+                    <Text size="xs" c="dimmed">
+                      {moeLabel(agg.key)}
+                    </Text>
+                  </Table.Td>
+                  <Table.Td ta="right">
+                    <Text size="sm" ff="monospace" fw={700}>
+                      {formatMOEValue(agg.mean)} ± {formatMOEValue(agg.stddev)}
+                    </Text>
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="10px" c="dimmed">
+                      {agg.unit}
+                    </Text>
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="10px" c="dimmed">
+                      [{formatMOEValue(agg.min)}, {formatMOEValue(agg.max)}] n={agg.count}
+                    </Text>
+                  </Table.Td>
+                </Table.Tr>
+              ))}
+            </Table.Tbody>
+          </Table>
+        </div>
+      ))}
+    </Stack>
+  );
+}
+
+function BatchResultsPanel() {
+  const batchResult = useStore((s) => s.batchResult);
+  if (!batchResult) return null;
+
+  return (
+    <Tabs defaultValue="moe" h="100%" style={{ display: 'flex', flexDirection: 'column' }}>
+      <Tabs.List>
+        <Tabs.Tab value="moe">Aggregated MOEs</Tabs.Tab>
+        <Tabs.Tab value="runs">
+          Runs
+          <Badge size="xs" ml={6} variant="light">
+            {batchResult.completed + batchResult.failed}/{batchResult.total}
+          </Badge>
+        </Tabs.Tab>
+      </Tabs.List>
+
+      <Tabs.Panel value="moe" flex={1} mih={0}>
+        <ScrollArea h="100%" p="sm">
+          {batchResult.aggregated_moes.length === 0 ? (
+            <Text size="xs" c="dimmed">
+              No completed runs yet — statistics will appear as replications finish.
+            </Text>
+          ) : (
+            <BatchMOETable metrics={batchResult.aggregated_moes} />
+          )}
+        </ScrollArea>
+      </Tabs.Panel>
+
+      <Tabs.Panel value="runs" flex={1} mih={0}>
+        <ScrollArea h="100%" p="sm">
+          <Stack gap={4}>
+            {batchResult.runs.map((r, i) => (
+              <Group key={r.id} gap={6} wrap="nowrap">
+                <Text size="10px" ff="monospace" c="dimmed" w={28} ta="right">
+                  #{i + 1}
+                </Text>
+                <Badge size="xs" variant="light" color={RUN_STATUS_COLOR[r.status]} w={90}>
+                  {r.status}
+                </Badge>
+                <Text size="xs" c="dimmed" truncate>
+                  {r.error || r.id}
+                </Text>
+              </Group>
+            ))}
+          </Stack>
+        </ScrollArea>
+      </Tabs.Panel>
+    </Tabs>
+  );
+}
+
 export default function ResultsPanel() {
   const results = useStore((s) => s.results);
+  const batchResult = useStore((s) => s.batchResult);
   const activeScenario = useStore((s) => s.activeScenario);
   const entities = activeScenario?.entities ?? [];
   const playbackTimeMS = useStore((s) => s.playbackTimeMS);
@@ -47,6 +148,7 @@ export default function ResultsPanel() {
 
   const range = useMemo(() => (results ? resultsTimeRange(results) : null), [results]);
 
+  if (batchResult) return <BatchResultsPanel />;
   if (!results || !range) return null;
 
   const relMs = (absMs: number) => absMs - range.startMs;
@@ -73,7 +175,7 @@ export default function ResultsPanel() {
       <Tabs.Panel value="moe" flex={1} mih={0}>
         <ScrollArea h="100%" p="sm">
           <Stack gap="sm">
-            {groupMOEsByCategory(results.moe_metrics).map(([cat, metrics]) => (
+            {groupByCategory(results.moe_metrics).map(([cat, metrics]) => (
               <div key={cat}>
                 <Text size="10px" fw={700} c="dimmed" tt="uppercase" mb={2}>
                   {MOE_CATEGORY_LABEL[cat]}

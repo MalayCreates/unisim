@@ -16,6 +16,9 @@ type Store interface {
 	CreateRun(ctx context.Context, r *Run) error
 	GetRun(ctx context.Context, id string) (*Run, error)
 	ListRunsForScenario(ctx context.Context, scenarioID string) ([]*Run, error)
+	// ListRunsForBatch returns all runs created together as one batch (see
+	// Run.BatchID), in creation order.
+	ListRunsForBatch(ctx context.Context, batchID string) ([]*Run, error)
 	UpdateRunStatus(ctx context.Context, id string, status RunStatus, errMsg string) error
 
 	// Dispatch queue

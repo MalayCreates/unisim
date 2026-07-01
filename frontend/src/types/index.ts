@@ -95,6 +95,7 @@ export interface Run {
   engine_id: string;
   status: RunStatus;
   error?: string;
+  batch_id?: string;
   created_at: string;
   updated_at: string;
 }
@@ -150,4 +151,29 @@ export interface SimResults {
   kill_chains: KillChain[];
   moe_metrics: MOEMetric[];
   created_at: string;
+}
+
+// --- Batches (Monte Carlo replications) ---
+
+export interface BatchMOEAggregate {
+  key: string;
+  unit: string;
+  count: number;
+  mean: number;
+  stddev: number;
+  min: number;
+  max: number;
+}
+
+export interface BatchSummary {
+  batch_id: string;
+  scenario_id: string;
+  engine_id: string;
+  total: number;
+  pending: number;
+  running: number;
+  completed: number;
+  failed: number;
+  runs: Run[];
+  aggregated_moes: BatchMOEAggregate[];
 }

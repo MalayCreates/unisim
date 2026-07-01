@@ -35,6 +35,10 @@ func NewRouter(st store.Store, reg *registry.Registry, runner Runner) http.Handl
 	v1.HandleFunc("/runs/{runID}", runs.get).Methods(http.MethodGet)
 	v1.HandleFunc("/runs/{runID}/results", runs.getResults).Methods(http.MethodGet)
 
+	batches := &batchHandler{st: st, runner: runner}
+	v1.HandleFunc("/scenarios/{id}/batches", batches.create).Methods(http.MethodPost)
+	v1.HandleFunc("/batches/{batchID}", batches.get).Methods(http.MethodGet)
+
 	adapters := &adapterHandler{reg: reg}
 	v1.HandleFunc("/adapters", adapters.register).Methods(http.MethodPost)
 	v1.HandleFunc("/adapters", adapters.list).Methods(http.MethodGet)

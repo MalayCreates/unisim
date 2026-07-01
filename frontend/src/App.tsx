@@ -15,7 +15,10 @@ const FOOTER_H = 48;
 export default function App() {
   const activeScenario = useStore((s) => s.activeScenario);
   const results = useStore((s) => s.results);
+  const batchResult = useStore((s) => s.batchResult);
 
+  // Playback (scrubbing a single track) only makes sense for one run; a
+  // batch aggregates many runs with no single timeline to scrub.
   const showFooter = !!results;
   const mapHeight = `calc(100vh - ${HEADER_H}px - ${showFooter ? FOOTER_H : 0}px)`;
 
@@ -46,9 +49,9 @@ export default function App() {
 
       <AppShell.Aside>
         <Text size="xs" c="dimmed" fw={700} p="sm" pb={0}>
-          {results ? 'RESULTS' : 'MISSION'}
+          {results || batchResult ? 'RESULTS' : 'MISSION'}
         </Text>
-        {results ? <ResultsPanel /> : <MissionPanel />}
+        {results || batchResult ? <ResultsPanel /> : <MissionPanel />}
       </AppShell.Aside>
 
       {showFooter && (

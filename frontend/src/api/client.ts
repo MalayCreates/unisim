@@ -1,4 +1,4 @@
-import type { Entity, EntityMission, Run, Scenario, SimResults } from '../types';
+import type { BatchSummary, Entity, EntityMission, Run, Scenario, SimResults } from '../types';
 
 // Base URL is configurable so Electron can point it at localhost.
 const BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? '/api/v1';
@@ -56,4 +56,20 @@ export const runsApi = {
 
   getResults: (runId: string): Promise<SimResults> =>
     request(`/runs/${runId}/results`),
+};
+
+// ---- Batches (Monte Carlo replications) ----
+
+export const batchesApi = {
+  create: (
+    scenarioId: string,
+    engineId: string | undefined,
+    count: number,
+  ): Promise<{ batch_id: string; run_ids: string[] }> =>
+    request(`/scenarios/${scenarioId}/batches`, {
+      method: 'POST',
+      body: JSON.stringify({ engine_id: engineId ?? 'custom-engine', count }),
+    }),
+
+  get: (batchId: string): Promise<BatchSummary> => request(`/batches/${batchId}`),
 };
