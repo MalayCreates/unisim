@@ -86,6 +86,12 @@ function BatchResultsPanel() {
   const batchResult = useStore((s) => s.batchResult);
   if (!batchResult) return null;
 
+  // The backend returns these as [] once populated, but a nil slice can
+  // serialize as null, so default defensively — indexing null here would
+  // crash the whole panel.
+  const aggregatedMOEs = batchResult.aggregated_moes ?? [];
+  const runs = batchResult.runs ?? [];
+
   return (
     <Tabs defaultValue="moe" h="100%" style={{ display: 'flex', flexDirection: 'column' }}>
       <Tabs.List>
@@ -100,12 +106,12 @@ function BatchResultsPanel() {
 
       <Tabs.Panel value="moe" flex={1} mih={0}>
         <ScrollArea h="100%" p="sm">
-          {batchResult.aggregated_moes.length === 0 ? (
+          {aggregatedMOEs.length === 0 ? (
             <Text size="xs" c="dimmed">
               No completed runs yet — statistics will appear as replications finish.
             </Text>
           ) : (
-            <BatchMOETable metrics={batchResult.aggregated_moes} />
+            <BatchMOETable metrics={aggregatedMOEs} />
           )}
         </ScrollArea>
       </Tabs.Panel>
@@ -113,7 +119,7 @@ function BatchResultsPanel() {
       <Tabs.Panel value="runs" flex={1} mih={0}>
         <ScrollArea h="100%" p="sm">
           <Stack gap={4}>
-            {batchResult.runs.map((r, i) => (
+            {runs.map((r, i) => (
               <Group key={r.id} gap={6} wrap="nowrap">
                 <Text size="10px" ff="monospace" c="dimmed" w={28} ta="right">
                   #{i + 1}

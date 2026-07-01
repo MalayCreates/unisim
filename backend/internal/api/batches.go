@@ -129,6 +129,9 @@ func (h *batchHandler) get(w http.ResponseWriter, r *http.Request) {
 		EngineID:   runs[0].EngineID,
 		Total:      len(runs),
 		Runs:       runs,
+		// Non-nil so it serializes as [] rather than null before any
+		// replication completes; the frontend indexes .length on it.
+		AggregatedMOEs: []BatchMOEAggregate{},
 	}
 
 	// key -> unit, collected values across completed runs.
