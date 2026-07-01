@@ -1,6 +1,8 @@
 package main
 
 import (
+	"strconv"
+
 	"github.com/usip/backend/schema"
 )
 
@@ -33,6 +35,19 @@ type simEntity struct {
 	// Derived capabilities (meters)
 	sensorRangeM float64
 	weaponRangeM float64
+	basePk       float64
+
+	// Health/ammo: healthMaxHP tracks the starting value for damage-status
+	// reporting; ammo of -1 means unlimited (the default, matching the
+	// engine's original infinite-fire behavior).
+	healthHP    float64
+	healthMaxHP float64
+	ammo        int
+
+	// Probabilistic detection falloff: when pdFalloff is false (the default),
+	// detection is the original hard range cutoff (Pd=1 inside sensor range).
+	pdFalloff bool
+	pdMin     float64
 
 	// Bookkeeping: enemies already detected (avoid duplicate detection events)
 	detected map[string]bool
@@ -70,6 +85,28 @@ func capabilityFor(t schema.EntityType) capability {
 	return defaultCapability
 }
 
+// attrFloat parses attrs[key] as a float64, returning fallback if the key is
+// absent or unparseable.
+func attrFloat(attrs map[string]string, key string, fallback float64) float64 {
+	if v, ok := attrs[key]; ok {
+		if f, err := strconv.ParseFloat(v, 64); err == nil {
+			return f
+		}
+	}
+	return fallback
+}
+
+// attrInt parses attrs[key] as an int, returning fallback if the key is
+// absent or unparseable.
+func attrInt(attrs map[string]string, key string, fallback int) int {
+	if v, ok := attrs[key]; ok {
+		if n, err := strconv.Atoi(v); err == nil {
+			return n
+		}
+	}
+	return fallback
+}
+
 // translate converts a canonical ScenarioProto into the engine's internal
 // entity list, attaching each entity's mission waypoints/ROE.
 func translate(s *schema.ScenarioProto) []*simEntity {
@@ -81,6 +118,16 @@ func translate(s *schema.ScenarioProto) []*simEntity {
 	out := make([]*simEntity, 0, len(s.Entities))
 	for _, e := range s.Entities {
 		cap := capabilityFor(e.Type)
+		attrs := e.Attributes
+
+		healthHP := attrFloat(attrs, "health_hp", 1)
+		pdMin, pdFalloff := 1.0, false
+		if v, ok := attrs["sensor_pd_min"]; ok {
+			if f, err := strconv.ParseFloat(v, 64); err == nil {
+				pdMin, pdFalloff = f, true
+			}
+		}
+
 		se := &simEntity{
 			id:           e.Id,
 			name:         e.Name,
@@ -88,8 +135,14 @@ func translate(s *schema.ScenarioProto) []*simEntity {
 			etype:        e.Type,
 			alive:        true,
 			roe:          schema.ROE_ROE_WEAPONS_TIGHT,
-			sensorRangeM: cap.sensorRangeM,
-			weaponRangeM: cap.weaponRangeM,
+			sensorRangeM: attrFloat(attrs, "sensor_range_m", cap.sensorRangeM),
+			weaponRangeM: attrFloat(attrs, "weapon_range_m", cap.weaponRangeM),
+			basePk:       attrFloat(attrs, "base_pk", cap.basePk),
+			healthHP:     healthHP,
+			healthMaxHP:  healthHP,
+			ammo:         attrInt(attrs, "ammo", -1),
+			pdFalloff:    pdFalloff,
+			pdMin:        pdMin,
 			detected:     make(map[string]bool),
 		}
 		if e.Position != nil {

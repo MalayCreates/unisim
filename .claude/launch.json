@@ -6,6 +6,20 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "frontend", "run", "dev", "--", "--port", "5173"],
       "port": 5173
+    },
+    {
+      "name": "backend",
+      "runtimeExecutable": "go",
+      "runtimeArgs": ["run", "./cmd/server"],
+      "cwd": "backend",
+      "port": 8080
+    },
+    {
+      "name": "adapter",
+      "runtimeExecutable": "go",
+      "runtimeArgs": ["run", ".", "-addr", ":50051", "-host", "localhost", "-port", "50051", "-backend", "http://localhost:8080"],
+      "cwd": "adapters/custom-engine",
+      "port": 50051
     }
   ]
 }

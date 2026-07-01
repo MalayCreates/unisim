@@ -1,6 +1,7 @@
 package main
 
 import (
+	"math"
 	"testing"
 
 	"github.com/usip/backend/schema"
@@ -94,5 +95,102 @@ func TestEngagementProducesEventsAndIsDeterministic(t *testing.T) {
 	}
 	if !sawDetection {
 		t.Error("expected a detection event")
+	}
+}
+
+// buildScenarioWithAttrs is buildScenario but with an attributes map attached
+// to the entity at entityIdx, so tests can exercise per-entity capability
+// overrides in isolation.
+func buildScenarioWithAttrs(entityIdx int, attrs map[string]string) *schema.ScenarioProto {
+	s := buildScenario()
+	s.Entities[entityIdx].Attributes = attrs
+	return s
+}
+
+func TestHealthOverrideSurvivesMultipleHits(t *testing.T) {
+	// Give red1 (index 1) a guaranteed hit (base_pk=1) and blue1 (index 0)
+	// 3 HP, so the outcome is deterministic rather than depending on pk
+	// rolls: red gets its first engagement window (its 50km weapon range vs
+	// blue's 40km) well before blue can fire back, so it lands exactly the
+	// 3 unanswered guaranteed hits needed to produce 2 DAMAGE events then a
+	// KILL, regardless of RNG seed.
+	s := buildScenario()
+	s.Entities[0].Attributes = map[string]string{"health_hp": "3"}
+	s.Entities[1].Attributes = map[string]string{"base_pk": "1"}
+
+	res := newEngine(s, "run-health").run("test-scenario", engineID, "run-health")
+
+	var damageEvents, killEvents int
+	for _, e := range res.Events {
+		if e.TargetEntityId != "blue1" {
+			continue
+		}
+		switch e.Type {
+		case schema.EventType_EVENT_TYPE_DAMAGE:
+			damageEvents++
+		case schema.EventType_EVENT_TYPE_KILL:
+			killEvents++
+		}
+	}
+	if damageEvents != 2 {
+		t.Errorf("expected exactly 2 DAMAGE events against the 3-HP entity before it dies, got %d", damageEvents)
+	}
+	if killEvents != 1 {
+		t.Errorf("expected exactly one KILL event for the 3-HP entity, got %d", killEvents)
+	}
+}
+
+func TestAmmoExhaustionStopsEngagement(t *testing.T) {
+	// blue1 (index 0) is the primary attacker in this scenario; giving it
+	// zero ammo should mean it never fires, regardless of what red1 does.
+	res := newEngine(buildScenarioWithAttrs(0, map[string]string{"ammo": "0"}), "run-ammo").
+		run("test-scenario", engineID, "run-ammo")
+
+	for _, e := range res.Events {
+		if e.EntityId == "blue1" && (e.Type == schema.EventType_EVENT_TYPE_ENGAGEMENT || e.Type == schema.EventType_EVENT_TYPE_KILL) {
+			t.Errorf("expected blue1 to never fire with ammo=0, got event %v", e.Type)
+		}
+	}
+	for _, kc := range res.KillChains {
+		if kc.AttackerEntityId == "blue1" {
+			t.Error("expected no kill chains with blue1 as attacker when ammo=0")
+		}
+	}
+}
+
+func TestCapabilityAttributeOverrides(t *testing.T) {
+	s := buildScenarioWithAttrs(1, map[string]string{
+		"sensor_range_m": "1",
+		"weapon_range_m": "1",
+	})
+	ents := translate(s)
+	var red *simEntity
+	for _, e := range ents {
+		if e.id == "red1" {
+			red = e
+		}
+	}
+	if red == nil {
+		t.Fatal("red1 not found after translate")
+	}
+	if red.sensorRangeM != 1 || red.weaponRangeM != 1 {
+		t.Errorf("expected overridden ranges of 1m, got sensor=%.0f weapon=%.0f", red.sensorRangeM, red.weaponRangeM)
+	}
+}
+
+func TestLerp(t *testing.T) {
+	cases := []struct {
+		a, b, frac, want float64
+	}{
+		{1, 0, 0, 1},
+		{1, 0, 1, 0},
+		{1, 0, 0.5, 0.5},
+		{1, 0.2, -1, 1},  // clamps below 0
+		{1, 0.2, 2, 0.2}, // clamps above 1
+	}
+	for _, c := range cases {
+		if got := lerp(c.a, c.b, c.frac); math.Abs(got-c.want) > 1e-9 {
+			t.Errorf("lerp(%v, %v, %v) = %v, want %v", c.a, c.b, c.frac, got, c.want)
+		}
 	}
 }

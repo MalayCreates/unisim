@@ -142,24 +142,32 @@ func (e *engine) interactions(t float64) {
 			d := haversineM(a.lat, a.lon, b.lat, b.lon)
 
 			// Detection
-			if d <= a.sensorRangeM && !a.detected[b.id] {
+			if d <= a.sensorRangeM && !a.detected[b.id] && e.rollDetection(a, d) {
 				a.detected[b.id] = true
 				e.emit(t, schema.EventType_EVENT_TYPE_DETECTION, a.id, b.id,
 					fmt.Sprintf("detected %s at %.0f m", b.name, d))
 			}
 
 			// Engagement + kill
-			if a.weaponRangeM > 0 && roeAllows(a) && d <= a.weaponRangeM {
+			if a.weaponRangeM > 0 && a.ammo != 0 && roeAllows(a) && d <= a.weaponRangeM {
 				key := a.id + "|" + b.id
 				if t-e.lastEngage[key] < reengageCoolS && e.lastEngage[key] != 0 {
 					continue
 				}
 				e.lastEngage[key] = t
+				if a.ammo > 0 {
+					a.ammo--
+				}
 				e.emit(t, schema.EventType_EVENT_TYPE_ENGAGEMENT, a.id, b.id,
 					fmt.Sprintf("engaging %s at %.0f m", b.name, d))
 
-				pk := capabilityFor(a.etype).basePk
-				if e.rng.Float64() < pk {
+				if e.rng.Float64() < a.basePk {
+					b.healthHP--
+					if b.healthHP > 0 {
+						e.emit(t, schema.EventType_EVENT_TYPE_DAMAGE, a.id, b.id,
+							fmt.Sprintf("damaged %s (%.0f/%.0f HP)", b.name, b.healthHP, b.healthMaxHP))
+						continue
+					}
 					b.alive = false
 					e.emit(t, schema.EventType_EVENT_TYPE_KILL, a.id, b.id,
 						fmt.Sprintf("killed %s", b.name))
@@ -176,10 +184,23 @@ func (e *engine) interactions(t float64) {
 	}
 }
 
+// rollDetection returns whether entity a detects a target at distance d
+// (already confirmed <= a.sensorRangeM by the caller). Entities without
+// pdFalloff always detect (hard cutoff, the engine's original behavior).
+func (e *engine) rollDetection(a *simEntity, d float64) bool {
+	if !a.pdFalloff {
+		return true
+	}
+	pd := lerp(1.0, a.pdMin, d/a.sensorRangeM)
+	return e.rng.Float64() < pd
+}
+
 func (e *engine) recordTrack(ent *simEntity, t float64) {
 	status := "alive"
 	if !ent.alive {
 		status = "killed"
+	} else if ent.healthHP < ent.healthMaxHP {
+		status = "damaged"
 	}
 	e.tracks[ent.id].Points = append(e.tracks[ent.id].Points, &schema.TrackPoint{
 		Ts:         e.ts(t),
@@ -312,3 +333,14 @@ func movePoint(lat, lon, d, bearing float64) (float64, float64) {
 
 func rad(d float64) float64 { return d * math.Pi / 180 }
 func deg(r float64) float64 { return r * 180 / math.Pi }
+
+// lerp linearly interpolates between a and b as frac goes from 0 to 1,
+// clamping frac to [0, 1].
+func lerp(a, b, frac float64) float64 {
+	if frac < 0 {
+		frac = 0
+	} else if frac > 1 {
+		frac = 1
+	}
+	return a + (b-a)*frac
+}
