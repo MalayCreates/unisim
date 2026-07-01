@@ -15,6 +15,7 @@ import {
 import { IconTrash, IconMapPin } from '@tabler/icons-react';
 import { useStore } from '../../store';
 import { ENTITY_TYPES, SIDES } from '../../lib/domain';
+import { UNIT_ATTR } from '../../lib/units';
 import type { EntityType, MissionType, ROE, Side } from '../../types';
 
 const MISSION_TYPES: { value: MissionType; label: string }[] = [
@@ -91,6 +92,19 @@ export default function MissionPanel() {
           data={ENTITY_TYPES}
           onChange={(v) => v && updateEntity({ ...entity, type: v as EntityType })}
           comboboxProps={{ withinPortal: true }}
+        />
+        <TextInput
+          size="xs"
+          label="Unit (optional)"
+          placeholder="e.g. Alpha Flight"
+          value={entity.attributes?.[UNIT_ATTR] ?? ''}
+          onChange={(e) => {
+            const v = e.currentTarget.value;
+            const attributes = { ...entity.attributes };
+            if (v.trim()) attributes[UNIT_ATTR] = v;
+            else delete attributes[UNIT_ATTR];
+            updateEntity({ ...entity, attributes });
+          }}
         />
         <div>
           <Text size="xs" mb={4}>

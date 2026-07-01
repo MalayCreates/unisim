@@ -3,6 +3,8 @@ import { Badge, Group, ScrollArea, Stack, Table, Tabs, Text } from '@mantine/cor
 import { useStore } from '../../store';
 import { resultsTimeRange } from '../../lib/playback';
 import { MOE_CATEGORY_LABEL, moeCategory, moeLabel, type MOECategory } from '../../lib/moeTaxonomy';
+import { computeUnitSummaries } from '../../lib/units';
+import { SIDE_CSS } from '../../lib/domain';
 import type { BatchMOEAggregate, EventType, RunStatus } from '../../types';
 
 const MOE_CATEGORY_ORDER: MOECategory[] = ['attrition', 'effectiveness', 'sensor', 'logistics'];
@@ -153,6 +155,10 @@ export default function ResultsPanel() {
   }, [entities]);
 
   const range = useMemo(() => (results ? resultsTimeRange(results) : null), [results]);
+  const unitSummaries = useMemo(
+    () => (results ? computeUnitSummaries(entities, results) : []),
+    [entities, results],
+  );
 
   if (batchResult) return <BatchResultsPanel />;
   if (!results || !range) return null;
@@ -176,6 +182,14 @@ export default function ResultsPanel() {
             {results.kill_chains.length}
           </Badge>
         </Tabs.Tab>
+        {unitSummaries.length > 0 && (
+          <Tabs.Tab value="units">
+            Units
+            <Badge size="xs" ml={6} variant="light">
+              {unitSummaries.length}
+            </Badge>
+          </Tabs.Tab>
+        )}
       </Tabs.List>
 
       <Tabs.Panel value="moe" flex={1} mih={0}>
@@ -267,6 +281,84 @@ export default function ResultsPanel() {
           </Stack>
         </ScrollArea>
       </Tabs.Panel>
+
+      {unitSummaries.length > 0 && (
+        <Tabs.Panel value="units" flex={1} mih={0}>
+          <ScrollArea h="100%" p="sm">
+            <Table withRowBorders={false} verticalSpacing={6}>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>
+                    <Text size="10px" c="dimmed" fw={700} tt="uppercase">
+                      Unit
+                    </Text>
+                  </Table.Th>
+                  <Table.Th ta="right">
+                    <Text size="10px" c="dimmed" fw={700} tt="uppercase">
+                      Strength
+                    </Text>
+                  </Table.Th>
+                  <Table.Th ta="right">
+                    <Text size="10px" c="dimmed" fw={700} tt="uppercase">
+                      Kills
+                    </Text>
+                  </Table.Th>
+                  <Table.Th ta="right">
+                    <Text size="10px" c="dimmed" fw={700} tt="uppercase">
+                      Rounds
+                    </Text>
+                  </Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {unitSummaries.map((u) => (
+                  <Table.Tr key={u.unitId}>
+                    <Table.Td>
+                      <Group gap={6} wrap="nowrap">
+                        <span
+                          style={{
+                            width: 9,
+                            height: 9,
+                            borderRadius: '50%',
+                            background: SIDE_CSS[u.side],
+                            flexShrink: 0,
+                          }}
+                        />
+                        <Text size="xs" truncate>
+                          {u.unitId}
+                        </Text>
+                      </Group>
+                    </Table.Td>
+                    <Table.Td ta="right">
+                      <Text
+                        size="xs"
+                        ff="monospace"
+                        fw={700}
+                        c={u.losses > 0 ? (u.alive === 0 ? 'red' : 'yellow') : undefined}
+                      >
+                        {u.alive}/{u.total}
+                      </Text>
+                      <Text size="10px" c="dimmed">
+                        {u.strengthPct.toFixed(0)}%{u.damaged > 0 ? ` · ${u.damaged} dmg` : ''}
+                      </Text>
+                    </Table.Td>
+                    <Table.Td ta="right">
+                      <Text size="xs" ff="monospace">
+                        {u.kills}
+                      </Text>
+                    </Table.Td>
+                    <Table.Td ta="right">
+                      <Text size="xs" ff="monospace">
+                        {u.rounds}
+                      </Text>
+                    </Table.Td>
+                  </Table.Tr>
+                ))}
+              </Table.Tbody>
+            </Table>
+          </ScrollArea>
+        </Tabs.Panel>
+      )}
     </Tabs>
   );
 }

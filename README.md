@@ -120,3 +120,13 @@ GET  /api/v1/batches/{batchID}       per-run status + aggregated_moes (mean/stdd
 Each replication is a normal run under the hood (own run ID, own RNG seed,
 scheduled through the same queue), just tagged with a shared `batch_id`. The
 frontend exposes this as a "Replications" count next to the Run button.
+
+### Units (organizational grouping)
+
+Entities can be grouped into units by setting a `unit_id` on their
+`attributes` map (via the "Unit" field in the mission panel, or directly in
+scenario JSON). Units are purely organizational — the sim engine does not
+interpret them. The frontend groups the entity list by unit and, after a run,
+shows a "By Unit" rollup (strength remaining, kills, rounds expended) derived
+client-side from the run's tracks/events/kill-chains. No backend or engine
+change is involved, so units work with any engine's results.
