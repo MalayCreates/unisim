@@ -39,7 +39,10 @@ class TestBuiltinEngine(unittest.TestCase):
         types = {e.type for e in res.events}
         self.assertIn(results_pb2.EVENT_TYPE_DETECTION, types)
         keys = {m.key for m in res.moe_metrics}
-        self.assertEqual(keys, {"blue_losses", "red_losses", "blue_kills", "red_kills", "total_kills"})
+        self.assertEqual(keys, {
+            "blue_losses", "red_losses", "blue_kills", "red_kills", "total_kills",
+            "detections_total", "rounds_expended", "avg_health_pct",
+        })
 
     def test_deterministic_for_same_run_id(self):
         a = BuiltinEngine().run(_scenario(), "panopticon", "run-X")

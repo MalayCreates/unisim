@@ -178,6 +178,42 @@ func TestCapabilityAttributeOverrides(t *testing.T) {
 	}
 }
 
+func TestComputeMOEsCanonicalMetrics(t *testing.T) {
+	res := newEngine(buildScenario(), "run-moe").run("test-scenario", engineID, "run-moe")
+
+	moes := make(map[string]float64, len(res.MoeMetrics))
+	for _, m := range res.MoeMetrics {
+		moes[m.Key] = m.Value
+	}
+	for _, key := range []string{
+		"blue_losses", "red_losses", "blue_kills", "red_kills", "total_kills",
+		"detections_total", "rounds_expended", "avg_health_pct",
+	} {
+		if _, ok := moes[key]; !ok {
+			t.Errorf("missing MOE key %q", key)
+		}
+	}
+
+	var wantDetections, wantEngagements float64
+	for _, e := range res.Events {
+		switch e.Type {
+		case schema.EventType_EVENT_TYPE_DETECTION:
+			wantDetections++
+		case schema.EventType_EVENT_TYPE_ENGAGEMENT:
+			wantEngagements++
+		}
+	}
+	if moes["detections_total"] != wantDetections {
+		t.Errorf("detections_total = %v, want %v (count of DETECTION events)", moes["detections_total"], wantDetections)
+	}
+	if moes["rounds_expended"] != wantEngagements {
+		t.Errorf("rounds_expended = %v, want %v (count of ENGAGEMENT events)", moes["rounds_expended"], wantEngagements)
+	}
+	if moes["avg_health_pct"] < 0 || moes["avg_health_pct"] > 100 {
+		t.Errorf("avg_health_pct = %v, want a value in [0, 100]", moes["avg_health_pct"])
+	}
+}
+
 func TestLerp(t *testing.T) {
 	cases := []struct {
 		a, b, frac, want float64

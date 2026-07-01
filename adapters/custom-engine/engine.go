@@ -213,8 +213,11 @@ func (e *engine) recordTrack(ent *simEntity, t float64) {
 	})
 }
 
+// computeMOEs returns the canonical cross-engine MOE set documented in
+// docs/moe-taxonomy.md, plus any engine-specific metrics.
 func (e *engine) computeMOEs() []*schema.MOEMetric {
 	var blueLosses, redLosses, blueKills, redKills float64
+	var healthPctSum float64
 	for _, ent := range e.entities {
 		if !ent.alive {
 			switch ent.side {
@@ -224,6 +227,7 @@ func (e *engine) computeMOEs() []*schema.MOEMetric {
 				redLosses++
 			}
 		}
+		healthPctSum += 100 * math.Max(ent.healthHP, 0) / ent.healthMaxHP
 	}
 	for _, kc := range e.killChains {
 		attacker := e.entityByID(kc.AttackerEntityId)
@@ -237,12 +241,31 @@ func (e *engine) computeMOEs() []*schema.MOEMetric {
 			redKills++
 		}
 	}
+
+	var detections, engagements float64
+	for _, ev := range e.events {
+		switch ev.Type {
+		case schema.EventType_EVENT_TYPE_DETECTION:
+			detections++
+		case schema.EventType_EVENT_TYPE_ENGAGEMENT:
+			engagements++
+		}
+	}
+
+	avgHealthPct := 0.0
+	if len(e.entities) > 0 {
+		avgHealthPct = healthPctSum / float64(len(e.entities))
+	}
+
 	return []*schema.MOEMetric{
 		{Key: "blue_losses", Value: blueLosses, Unit: "entities"},
 		{Key: "red_losses", Value: redLosses, Unit: "entities"},
 		{Key: "blue_kills", Value: blueKills, Unit: "entities"},
 		{Key: "red_kills", Value: redKills, Unit: "entities"},
 		{Key: "total_kills", Value: float64(len(e.killChains)), Unit: "entities"},
+		{Key: "detections_total", Value: detections, Unit: "events"},
+		{Key: "rounds_expended", Value: engagements, Unit: "rounds"},
+		{Key: "avg_health_pct", Value: avgHealthPct, Unit: "percent"},
 	}
 }
 

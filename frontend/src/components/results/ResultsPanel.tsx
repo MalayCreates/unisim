@@ -2,7 +2,26 @@ import { useMemo } from 'react';
 import { Badge, Group, ScrollArea, Stack, Table, Tabs, Text } from '@mantine/core';
 import { useStore } from '../../store';
 import { resultsTimeRange } from '../../lib/playback';
-import type { EventType } from '../../types';
+import { MOE_CATEGORY_LABEL, moeCategory, moeLabel, type MOECategory } from '../../lib/moeTaxonomy';
+import type { EventType, MOEMetric } from '../../types';
+
+const MOE_CATEGORY_ORDER: MOECategory[] = ['attrition', 'effectiveness', 'sensor', 'logistics'];
+
+function groupMOEsByCategory(metrics: MOEMetric[]): [MOECategory, MOEMetric[]][] {
+  const groups = new Map<MOECategory, MOEMetric[]>();
+  for (const mt of metrics) {
+    const cat = moeCategory(mt.key);
+    if (!groups.has(cat)) groups.set(cat, []);
+    groups.get(cat)!.push(mt);
+  }
+  return MOE_CATEGORY_ORDER.filter((cat) => groups.has(cat)).map((cat) => [cat, groups.get(cat)!]);
+}
+
+// Rounds MOEs computed as fractions/averages (e.g. avg_health_pct) to 1
+// decimal place for display; whole-number counts print exactly.
+function formatMOEValue(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
 
 const EVENT_COLOR: Record<EventType, string> = {
   detection: 'blue',
@@ -53,29 +72,38 @@ export default function ResultsPanel() {
 
       <Tabs.Panel value="moe" flex={1} mih={0}>
         <ScrollArea h="100%" p="sm">
-          <Table withRowBorders={false} verticalSpacing={4}>
-            <Table.Tbody>
-              {results.moe_metrics.map((mt) => (
-                <Table.Tr key={mt.key}>
-                  <Table.Td>
-                    <Text size="xs" c="dimmed">
-                      {mt.key.replace(/_/g, ' ')}
-                    </Text>
-                  </Table.Td>
-                  <Table.Td ta="right">
-                    <Text size="sm" ff="monospace" fw={700}>
-                      {mt.value}
-                    </Text>
-                  </Table.Td>
-                  <Table.Td>
-                    <Text size="10px" c="dimmed">
-                      {mt.unit}
-                    </Text>
-                  </Table.Td>
-                </Table.Tr>
-              ))}
-            </Table.Tbody>
-          </Table>
+          <Stack gap="sm">
+            {groupMOEsByCategory(results.moe_metrics).map(([cat, metrics]) => (
+              <div key={cat}>
+                <Text size="10px" fw={700} c="dimmed" tt="uppercase" mb={2}>
+                  {MOE_CATEGORY_LABEL[cat]}
+                </Text>
+                <Table withRowBorders={false} verticalSpacing={4}>
+                  <Table.Tbody>
+                    {metrics.map((mt) => (
+                      <Table.Tr key={mt.key}>
+                        <Table.Td>
+                          <Text size="xs" c="dimmed">
+                            {moeLabel(mt.key)}
+                          </Text>
+                        </Table.Td>
+                        <Table.Td ta="right">
+                          <Text size="sm" ff="monospace" fw={700}>
+                            {formatMOEValue(mt.value)}
+                          </Text>
+                        </Table.Td>
+                        <Table.Td>
+                          <Text size="10px" c="dimmed">
+                            {mt.unit}
+                          </Text>
+                        </Table.Td>
+                      </Table.Tr>
+                    ))}
+                  </Table.Tbody>
+                </Table>
+              </div>
+            ))}
+          </Stack>
         </ScrollArea>
       </Tabs.Panel>
 

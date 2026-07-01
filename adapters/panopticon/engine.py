@@ -63,7 +63,7 @@ class BuiltinEngine:
             entity_tracks=[tracks[i] for i in track_order],
             events=events,
             kill_chains=kill_chains,
-            moe_metrics=_compute_moes(entities, kill_chains),
+            moe_metrics=_compute_moes(entities, kill_chains, events),
         )
 
 
@@ -192,7 +192,13 @@ def _record(e, t, tracks, start_epoch) -> None:
     )
 
 
-def _compute_moes(entities, kill_chains):
+def _compute_moes(entities, kill_chains, events):
+    """Canonical cross-engine MOE set, see docs/moe-taxonomy.md.
+
+    BuiltinEngine has no partial-health model (binary alive/dead), so
+    avg_health_pct degrades to 100/0 per entity per the taxonomy's documented
+    fallback for engines without hit points.
+    """
     blue_losses = red_losses = blue_kills = red_kills = 0.0
     by_id = {e.id: e for e in entities}
     for e in entities:
@@ -209,12 +215,22 @@ def _compute_moes(entities, kill_chains):
             blue_kills += 1
         elif attacker.side == entity_pb2.SIDE_ENEMY:
             red_kills += 1
+
+    detections = sum(1 for e in events if e.type == results_pb2.EVENT_TYPE_DETECTION)
+    engagements = sum(1 for e in events if e.type == results_pb2.EVENT_TYPE_ENGAGEMENT)
+    avg_health_pct = (
+        100.0 * sum(1 for e in entities if e.alive) / len(entities) if entities else 0.0
+    )
+
     return [
         results_pb2.MOEMetric(key="blue_losses", value=blue_losses, unit="entities"),
         results_pb2.MOEMetric(key="red_losses", value=red_losses, unit="entities"),
         results_pb2.MOEMetric(key="blue_kills", value=blue_kills, unit="entities"),
         results_pb2.MOEMetric(key="red_kills", value=red_kills, unit="entities"),
         results_pb2.MOEMetric(key="total_kills", value=float(len(kill_chains)), unit="entities"),
+        results_pb2.MOEMetric(key="detections_total", value=float(detections), unit="events"),
+        results_pb2.MOEMetric(key="rounds_expended", value=float(engagements), unit="rounds"),
+        results_pb2.MOEMetric(key="avg_health_pct", value=avg_health_pct, unit="percent"),
     ]
 
 
