@@ -6,8 +6,11 @@
     "types": ["node"],
     "skipLibCheck": true,
 
-    /* Bundler mode */
-    "module": "nodenext",
+    /* Bundler mode — vite.config.ts is loaded by Vite's esbuild bundler, not
+       Node's resolver, so model that (matches tsconfig.app.json). nodenext
+       here mis-resolves CJS-typed ESM plugins like vite-plugin-cesium. */
+    "module": "esnext",
+    "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",
